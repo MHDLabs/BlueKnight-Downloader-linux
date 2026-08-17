@@ -1,0 +1,151 @@
+Spotify Downloader Portable - Third-party notices
+==================================================
+
+spotDL 4.5.2
+-------------
+Copyright (c) 2021 spotDL Developers
+Licensed under the MIT License.
+Project and corresponding source: https://github.com/spotDL/spotify-downloader/tree/v4.5.2
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+FFmpeg
+------
+This package includes an FFmpeg GPL build from BtbN/FFmpeg-Builds.
+Build source and scripts: https://github.com/BtbN/FFmpeg-Builds
+FFmpeg source: https://ffmpeg.org/download.html
+Licensed under GNU GPL version 3 or later for this build. The complete GPLv3
+license text is included as GPL-3.0.txt.
+
+Deno 2.9.5
+----------
+Copyright 2018-2026 the Deno authors
+Licensed under the MIT License.
+Project and source: https://github.com/denoland/deno
+Bundled as the JavaScript runtime for yt-dlp's EJS YouTube challenge solver.
+
+gallery-dl 1.32.9
+-----------------
+Copyright (c) 2014-2025 Mike Faehrmann
+Licensed under GNU GPL version 2.
+Project and corresponding source: https://github.com/mikf/gallery-dl
+Used by this app to resolve photo, GIF and mixed media posts that yt-dlp,
+being video-only, cannot extract.
+
+Streamlink 8.5.0
+----------------
+Copyright (c) 2015-2026 Streamlink Team
+Licensed under the Simplified BSD License.
+Project and source: https://github.com/streamlink/streamlink
+Used by this app to resolve and record supported live and HLS streams.
+
+NewPipeExtractor 0.26.1
+-----------------------
+Copyright (c) Team NewPipe and contributors
+Licensed under GNU GPL version 3 or later.
+Project and corresponding source:
+https://github.com/TeamNewPipe/NewPipeExtractor/tree/v0.26.1
+Bundled in the Android app as a fallback resolver for YouTube, YouTube Music,
+SoundCloud, Bandcamp, PeerTube, and media.ccc.de after yt-dlp fails.
+
+img2pdf
+-------
+Copyright (c) 2015-2026 Johannes Schauer Marin Rodrigues
+Licensed under GNU LGPL version 3 or later.
+Project and source: https://gitlab.mister-muffin.de/josch/img2pdf
+Used to assemble authorized/public manga and manhwa images into PDF files.
+
+pikepdf
+-------
+Copyright (c) 2017-2026 James R. Barlow
+Licensed under the Mozilla Public License 2.0.
+Project and source: https://github.com/pikepdf/pikepdf
+
+Pillow
+------
+Copyright (c) 2010-2026 Alex Clark and contributors
+Licensed under the HPND License.
+Project and source: https://github.com/python-pillow/Pillow
+
+PyInstaller bootloader
+----------------------
+The GUI executable contains the PyInstaller bootloader.
+Project and license: https://github.com/pyinstaller/pyinstaller
+
+
+--------------------------------------------------------------------------
+YoutubeExplode / YoutubeExplode.Converter
+--------------------------------------------------------------------------
+Copyright (c) Oleksii Holub (Tyrrrz)
+Licensed under the GNU Lesser General Public License v3.0.
+
+Used as the desktop's second YouTube engine, through its published NuGet
+package and public API. No source from the project is copied into this
+application; the sidecar in dotnet/BlueKnightYoutube is our own wrapper and
+links the library dynamically, which is what the LGPL asks of a work that uses
+it. The library can therefore be replaced with another build of the same
+version by rebuilding that sidecar.
+
+  https://github.com/Tyrrrz/YoutubeExplode
+
+The behaviour this engine relies on — visitor-data resolution, the ANDROID_VR
+innertube client, the TV-embedded fallback, signature deciphering and the
+stream request handling — is the library's own, deliberately, so that updating
+the package is what keeps the engine working when YouTube changes.
+
+--------------------------------------------------------------------------
+YouTube.js (youtubei.js)
+--------------------------------------------------------------------------
+Copyright (c) LuanRT
+Licensed under the MIT License.
+
+Used as an additional YouTube engine — fourth on the desktop, third on
+Android. The library is fetched at build time as its published ESM bundle and
+loaded as-is; none of its source is copied into this application. The desktop
+runs it under the Deno already shipped for yt-dlp's challenge solver, and
+Android runs the same script inside a WebView.
+
+  https://github.com/LuanRT/YouTube.js
+
+--------------------------------------------------------------------------
+NewPipeExtractor
+--------------------------------------------------------------------------
+Copyright (c) Team NewPipe
+Licensed under the GNU General Public License v3.0.
+
+Used as a YouTube engine — second on Android, third on the desktop. It is
+called through its published API from a helper that runs as its own process,
+and none of its source is copied into this application. The Android build
+reaches the same library through the app's own JVM.
+
+  https://github.com/TeamNewPipe/NewPipeExtractor
+
+--------------------------------------------------------------------------
+BgUtils (bgutils-js)
+--------------------------------------------------------------------------
+Copyright (c) LuanRT
+Licensed under the MIT License.
+
+Used to mint YouTube proof-of-origin tokens. Two small published ES modules
+are vendored unmodified — the BotGuard client and the WebPO minter — because
+they are a few kilobytes and a build should not need the network for them.
+They are handed to yt-dlp, the primary engine, rather than used by a fallback:
+the refusal a token answers happens on the first attempt, not the third.
+
+  https://github.com/LuanRT/BgUtils
