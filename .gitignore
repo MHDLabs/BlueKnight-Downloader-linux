@@ -4,3 +4,6 @@ engines/youtubejs/youtubei.bundle.mjs
 
 __pycache__/
 *.pyc
+
+# The Android signer. Supplied by ANDROID_KEYSTORE_BASE64 in CI, never committed.
+keystore/
