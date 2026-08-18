@@ -9,7 +9,11 @@ plugins {
 
 val appRoot = rootProject.projectDir.parentFile   // the spoty/ folder
 val signingPropsFile = rootProject.file("keystore.properties")
-val repositoryKeystore = rootProject.file("../../keystore/whitebooster.jks")
+// The signer lives at the repository root in both layouts this source is
+// built from: one level up in the standalone downloader repository, two in
+// the monorepo where the app sits under spoty/.
+val repositoryKeystore = rootProject.file("../keystore/whitebooster.jks")
+    .takeIf { it.exists() } ?: rootProject.file("../../keystore/whitebooster.jks")
 val supportedAbis = listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 val requestedAbi = providers.gradleProperty("targetAbi").orNull ?: "universal"
 val packagedAbis = if (requestedAbi == "universal") {
@@ -79,8 +83,8 @@ android {
         applicationId = "net.blueknight.downloader"
         minSdk = 24          // Android 7.0: the oldest API the WebView bridge needs
         targetSdk = 34
-        versionCode = 70024
-        versionName = "7.7.2"
+        versionCode = 70027
+        versionName = "7.9.0"
 
         // A normal build is universal. CI also passes -PtargetAbi=<ABI> to
         // produce smaller architecture-specific APKs from the same sources.

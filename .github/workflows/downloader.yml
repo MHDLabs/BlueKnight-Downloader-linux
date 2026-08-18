@@ -12,7 +12,9 @@ name: Downloader
 on:
   push:
     branches: [main]
-    tags: ["downloader-v*"]
+    # Two names for the same thing: this repository tags its releases
+    # "Blueknightv2.1"; the monorepo it is synced from uses "downloader-v*".
+    tags: ["downloader-v*", "Blueknightv*"]
     paths: ["**", "!README.md"]
   pull_request:
     paths: ["**", "!README.md"]
@@ -261,10 +263,10 @@ jobs:
           } > keystore.properties
 
       - name: Require stable signing for a tagged release
-        if: startsWith(github.ref, 'refs/tags/downloader-v') && env.HAS_KEYSTORE != 'true'
+        if: (startsWith(github.ref, 'refs/tags/downloader-v') || startsWith(github.ref, 'refs/tags/Blueknightv')) && env.HAS_KEYSTORE != 'true'
         working-directory: android
         run: |
-          test -f ../../keystore/whitebooster.jks || {
+          test -f ../keystore/whitebooster.jks || {
             echo "Tagged Android releases require ANDROID_* secrets or the repository signer." >&2
             exit 1
           }
@@ -302,7 +304,7 @@ jobs:
 
   release:
     needs: [desktop, android]
-    if: startsWith(github.ref, 'refs/tags/downloader-v')
+    if: (startsWith(github.ref, 'refs/tags/downloader-v') || startsWith(github.ref, 'refs/tags/Blueknightv'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

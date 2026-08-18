@@ -124,11 +124,11 @@ BlueKnightdownloader/
 └─ Documents & Ebooks/
 ```
 
-Change the parent folder in **Download settings**; the per-source folders follow.
+Change the parent folder in **Downloader settings**; the per-source folders follow.
 
 ## Local conversion
 
-**Download settings** includes a local media converter for MP3, FLAC, WAV, M4A,
+**Downloader settings** includes a local media converter for MP3, FLAC, WAV, M4A,
 OGG, AAC, MP4, MKV, WebM, MOV and AVI. Video conversion offers H.264, H.265 and
 VP9, three quality profiles, original/preset/custom dimensions, source/24/30/60
 FPS, and selectable audio bitrate. FFmpeg performs a real transcode and writes
