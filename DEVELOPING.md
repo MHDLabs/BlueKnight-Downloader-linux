@@ -317,6 +317,7 @@ Run the frontend checks before submitting UI changes:
 ```bash
 python tests/check_web_assets.py
 node tests/check_web_scripts.mjs
+python tests/check_bridge_contract.py
 ```
 
 These checks validate local asset paths, script order, absence of inline code,

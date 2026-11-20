@@ -1,0 +1,172 @@
+{
+  "version": 1,
+  "transport": "pywebview.js_api",
+  "description": "Desktop WebView-to-engine boundary. Keep stable while replacing the Python desktop engine with modular components and a Rust core.",
+  "api": [
+    {
+      "name": "hello",
+      "args": []
+    },
+    {
+      "name": "poll",
+      "args": []
+    },
+    {
+      "name": "set_option",
+      "args": [
+        "name",
+        "value"
+      ]
+    },
+    {
+      "name": "minimize",
+      "args": []
+    },
+    {
+      "name": "toggle_maximize",
+      "args": []
+    },
+    {
+      "name": "close",
+      "args": []
+    },
+    {
+      "name": "start_download",
+      "args": [
+        "url",
+        "fmt",
+        "quality"
+      ]
+    },
+    {
+      "name": "start_media",
+      "args": [
+        "kind",
+        "url",
+        "quality",
+        "audio_only",
+        "limit"
+      ]
+    },
+    {
+      "name": "start_pdf",
+      "args": [
+        "url",
+        "limit"
+      ]
+    },
+    {
+      "name": "start_manga",
+      "args": [
+        "url",
+        "limit"
+      ]
+    },
+    {
+      "name": "stop_download",
+      "args": []
+    },
+    {
+      "name": "set_preset",
+      "args": [
+        "proxy_type",
+        "url"
+      ]
+    },
+    {
+      "name": "test_proxy",
+      "args": []
+    },
+    {
+      "name": "check_setup",
+      "args": []
+    },
+    {
+      "name": "sign_in",
+      "args": [
+        "kind"
+      ]
+    },
+    {
+      "name": "finish_sign_in",
+      "args": []
+    },
+    {
+      "name": "cookie_status",
+      "args": []
+    },
+    {
+      "name": "update_tools",
+      "args": []
+    },
+    {
+      "name": "open_folder",
+      "args": []
+    },
+    {
+      "name": "open_telegram",
+      "args": []
+    },
+    {
+      "name": "clipboard",
+      "args": []
+    },
+    {
+      "name": "copy_text",
+      "args": [
+        "text"
+      ]
+    },
+    {
+      "name": "about",
+      "args": []
+    },
+    {
+      "name": "browse",
+      "args": []
+    },
+    {
+      "name": "convert_media",
+      "args": [
+        "options"
+      ]
+    },
+    {
+      "name": "convert_document",
+      "args": []
+    },
+    {
+      "name": "convert_image_folder",
+      "args": []
+    }
+  ],
+  "events": [
+    "bytes",
+    "components",
+    "converting",
+    "cookie_status",
+    "failure",
+    "file",
+    "finished",
+    "folder",
+    "log",
+    "plan",
+    "proxy",
+    "setup",
+    "setup_done",
+    "setup_error",
+    "signin",
+    "stage",
+    "status",
+    "success",
+    "toast",
+    "total",
+    "track",
+    "updating"
+  ],
+  "platform_specific_events": {
+    "android": [
+      "progress"
+    ]
+  }
+}

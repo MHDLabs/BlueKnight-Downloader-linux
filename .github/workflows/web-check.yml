@@ -6,6 +6,7 @@ on:
     paths:
       - "web/**"
       - "tests/**"
+      - "contracts/**"
       - ".github/workflows/web-check.yml"
   pull_request:
     paths:
@@ -37,3 +38,6 @@ jobs:
 
       - name: Check JavaScript syntax and shared bindings
         run: node tests/check_web_scripts.mjs
+
+      - name: Check Python and frontend bridge contract
+        run: python tests/check_bridge_contract.py
