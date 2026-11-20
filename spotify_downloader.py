@@ -4253,7 +4253,7 @@ class SpotifyDownloader:
         codec = options["codec"]
         preset = "slow" if options["quality"] in {"master", "high"} else (
             "fast" if options["quality"] == "compact" else "medium")
-        if codec == "h265":        elif codec == "h265":
+        if codec == "h265":
             command = base + ["-c:v", "libx265", "-preset", preset, "-crf", crf]
             if output_format in {"mp4", "mov"}:
                 command += ["-tag:v", "hvc1"]
