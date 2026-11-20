@@ -6,9 +6,10 @@
 ## Scope
 
 - **Primary target:** Linux desktop.
-- **Compatibility target:** Windows desktop must continue to work throughout the refactor.
-- **Platform scope:** this fork ships desktop builds only. Mobile application
-  code is not part of the maintained product.
+- **Secondary compatibility target:** Windows desktop code and packaging are retained, but automated Windows builds are temporarily paused. Re-enable them after Linux stabilization and cross-platform regression coverage.
+- **Platform scope:** desktop only. Linux is the active build and test target;
+  Windows is a retained secondary compatibility target; mobile application
+  code is outside this fork.
 - **Feature policy:** one complete application. Existing engines and user-facing
   capabilities are not removed to make packaging smaller.
 - **UI policy:** preserve the current interface and its behaviour while the internals

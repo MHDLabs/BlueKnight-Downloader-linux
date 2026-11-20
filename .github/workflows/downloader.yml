@@ -1,4 +1,4 @@
-# Blue Knight Downloader — Windows and Linux desktop packages.
+# Blue Knight Downloader — Linux-first desktop package. Windows CI is paused.
 #
 # PyInstaller cannot cross-compile: Windows and Linux packages are produced on
 # their native runners. That is why this workflow uses separate platform jobs.
@@ -48,7 +48,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest,   target: windows-x64 }
           - { os: ubuntu-24.04,     target: linux-x64 }
     runs-on: ${{ matrix.os }}
     steps:
@@ -76,7 +75,7 @@ jobs:
           pip install -r requirements.txt
 
       # pywebview draws through WebKitGTK on Linux and fails at import without
-      # it. Windows uses the WebView2 runtime.
+      # it. The Windows packaging script is retained, but its CI job is paused.
       # Install the Python dependencies first: after PYTHONPATH is exported,
       # pip would otherwise see Ubuntu's protected system copy of itself.
       - name: Install WebKitGTK
@@ -91,12 +90,6 @@ jobs:
           # both to the build-time probe and to PyInstaller's import analysis.
           echo "PYTHONPATH=/usr/lib/python3/dist-packages" >> "$GITHUB_ENV"
 
-      - name: Build (Windows)
-        if: matrix.os == 'windows-latest'
-
-        shell: pwsh
-        run: ./build_portable.ps1
-
       - name: Build (Linux)
         if: startsWith(matrix.os, 'ubuntu')
 
@@ -104,15 +97,6 @@ jobs:
 
       # A binary that cannot start is not a build. Run the frozen executable,
       # not the source interpreter, so missing PyInstaller data is caught.
-      - name: Smoke test the Windows package
-        if: matrix.os == 'windows-latest'
-
-        shell: pwsh
-        run: |
-          $process = Start-Process ./release/BlueKnightDownloader.exe `
-            -ArgumentList '--self-test' -WindowStyle Hidden -Wait -PassThru
-          exit $process.ExitCode
-
       - name: Smoke test the Linux package
         if: startsWith(matrix.os, 'ubuntu')
 

@@ -5,7 +5,7 @@ TikTok, Instagram, SoundCloud, X, PDF/ebook documents, and other
 yt-dlp-supported video sites**, sorting what it fetches, and handling restricted
 networks and common sign-in walls.
 
-The maintained desktop targets are Linux and Windows. Linux is the primary development target; Windows compatibility is checked in CI.
+The maintained desktop targets are Linux and Windows. Linux is the primary development target. Windows compatibility remains a secondary goal, but automated Windows builds and smoke tests are temporarily paused; the Windows build script is retained for manual verification.
 The downloader currently uses a Python engine and a local WebView interface.
 The interface is split into HTML, CSS and ordered JavaScript files; the engine
 and platform packaging are being modularized without dropping existing features.
@@ -269,8 +269,8 @@ portable.mode, which stores updateable tools and application-managed data under
 a data/ directory beside the executable. A JDK 17 and .NET 8 SDK are used to
 build the NewPipe and YoutubeExplode fallback helpers when available.
 
-CI validates Windows x64 and Linux x64 builds. Tags named
-`downloader-v*` or `Blueknightv*` publish the desktop ZIP and TAR.GZ artifacts.
+CI currently builds and smoke-tests Linux x64 only. Windows packaging remains available through `build_portable.ps1`, but its automated job is paused. Tags named
+`downloader-v*` or `Blueknightv*` publish the Linux TAR.GZ artifact.
 
 | File | Role |
 | --- | --- |
