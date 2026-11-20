@@ -59,7 +59,7 @@ have regression coverage.
 
 ## Phase 2 — Engine installation and lifecycle service
 
-**Status: In progress — discovery and version probing extracted**
+**Status: Implementation complete — Linux package verification in progress**
 
 The platform-specific Python wheel selector lives in
 `blueknight/engines/wheels.py`. It matches PyPI wheel tags against the running
@@ -72,14 +72,22 @@ mirror downloads, archive member extraction, SHA-256 validation, version checks
 and atomic activation. The desktop methods remain compatibility adapters and
 inject the existing proxy-aware opener plus UI/log callbacks.
 
-Python wheel discovery, SHA-256 validation and staging remain in their existing
-dedicated path. The remaining work in this phase is to move the Python-engine
-staging/registry lifecycle and the FFmpeg-specific installer behind focused
-service interfaces, then verify update/rollback behaviour end to end. Do not
-change the set of engines or their update sources without a separate, tested
-reason.
-**Exit criteria:** the manager has focused unit tests and the GUI still reports,
-installs, updates and launches the same tools as before.
+Python wheel discovery, SHA-256 validation, safe staging and atomic
+next-launch registry updates now live behind EngineManager. The frozen/source
+child-process compatibility probe remains in SpotifyDownloader as an
+application-specific boundary. The FFmpeg installer is isolated in
+blueknight/engines/ffmpeg.py; both binaries must pass launch checks before
+replacement, and a failed second replacement rolls back the first.
+
+Focused tests now cover the wheel lifecycle, FFmpeg ZIP/TAR extraction,
+platform-specific split archives, failed validation, and pair rollback. The
+latest Web CI run reports 78 passing Python tests; the Linux package build and
+frozen smoke test are checked separately below. Do not change the set of
+engines or their update sources without a separate, tested reason.
+
+**Exit criteria:** the engine lifecycle services have focused tests, the Linux
+package and frozen smoke test pass, and the GUI still reports, installs,
+updates and launches the same tools as before.
 
 ## Phase 3 — Download orchestration and engine adapters
 

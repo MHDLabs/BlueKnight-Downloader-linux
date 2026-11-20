@@ -61,13 +61,13 @@ contract until there is a deliberate, tested version change.
 
 ## Responsibilities currently concentrated in the Python engine
 
-The following are logical responsibilities, not completed modules yet:
+The following are logical responsibilities. Some now have focused module boundaries; the remaining application orchestration stays in the desktop facade:
 
 | Responsibility | Existing code examples |
 | --- | --- |
 | Application lifecycle and UI events | snapshot, begin, drain, ui, log, stop_download |
 | Network and proxy | blueknight/network/proxy.py now owns URL normalization, credential-safe display, process proxy environment and the SOCKS5 bridge; SpotifyDownloader still owns UI-facing proxy settings and connection tests |
-| Tool installation and updates | blueknight/engines/catalog.py owns version/platform manifests and release URLs; SpotifyDownloader still owns installation, validation and activation |
+| Tool installation and updates | blueknight/engines/catalog.py owns version/platform manifests and release URLs; blueknight/engines/manager.py owns external-tool discovery, validation, downloads and installation; blueknight/engines/ffmpeg.py owns the FFmpeg/ffprobe pair installer; SpotifyDownloader keeps UI-facing setup and compatibility adapters |
 | Authentication and cookies | probe_cookie, usable_cookies, sign_in, finish_sign_in, refresh_session, cookie_status |
 | Spotify | start_download, download_with_spotdl, Spotify metadata and matching helpers |
 | Media download orchestration | start_media_download, download_with_ytdlp, download_with_streamlink, gallery-dl fallback |
@@ -107,9 +107,16 @@ Windows wheels and universal wheels are selected against the running runtime.
 The five deterministic tests simulate Linux and Windows tag sets without
 claiming that Windows CI is active.
 
-These are focused boundaries, not a complete engine manager. Downloading,
-native executable validation, version probing, checksum checks, installation
-and activation still remain in the application service. No engine was removed.
+These are focused boundaries, not a complete download orchestrator. The engine
+manager now owns external-tool discovery, native executable validation, release
+lookup, mirror downloads, archive/checksum validation and activation. It also
+owns PyPI wheel discovery, SHA-256 verification, safe staging and atomic
+next-launch registry updates. The FFmpeg-specific installer in
+blueknight/engines/ffmpeg.py stages and launch-checks both ffmpeg and ffprobe,
+then replaces the pair with rollback protection if the second replacement
+fails. The frozen child-process compatibility probe for a staged Python-wheel
+set remains in SpotifyDownloader because it depends on the desktop app entry
+point and frozen/source execution mode. No engine was removed.
 
 ## Engine discovery and verified tool installation
 
@@ -123,13 +130,16 @@ The engine manager in `blueknight/engines/manager.py` owns:
 - release metadata lookup and version-specific spotDL/yt-dlp mirror selection;
 - proxy-aware mirror downloads with the existing progress/log callbacks;
 - archive member extraction, SHA-256 verification, executable/version checks
-  and atomic activation.
+  and activation of external tools;
+- PyPI wheel selection, digest verification, safe staging and atomic registry
+  updates for next-launch activation.
 
 `SpotifyDownloader` constructs the manager and keeps its previous methods as
 compatibility adapters. The manager receives the existing network opener,
-which preserves proxy routing, and the existing UI/log callbacks. Python-wheel
-staging and the FFmpeg-specific installer remain separate for now. Focused
-tests use fake responses and temporary files; they do not contact real mirrors.
+which preserves proxy routing, and the existing UI/log callbacks. The Python-wheel lifecycle is handled by EngineManager, while the FFmpeg pair
+is handled by FFmpegInstaller. SpotifyDownloader retains thin compatibility
+adapters and the app-specific child-process compatibility check. Focused tests
+use fake responses and temporary files; they do not contact real mirrors.
 
 
 ## Intended module boundaries
