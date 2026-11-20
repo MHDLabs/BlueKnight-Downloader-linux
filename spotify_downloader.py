@@ -24,7 +24,6 @@ import urllib.request
 import urllib.error
 import tempfile
 import io
-from html.parser import HTMLParser
 from urllib.parse import quote, unquote, urljoin, urlsplit
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -151,8 +150,6 @@ GENERAL_CHALLENGE = re.compile(
 # yt-dlp loads the cookie jar before it touches the network, so a bogus URL is
 # enough to find out whether a jar is readable — no request, no rate limit.
 COOKIE_PROBE_URL = "blueknightprobe://cookies"
-# The domain whose session makes a jar worth using, per source.
-
 # Performance optimization: Batch UI updates
 UI_UPDATE_INTERVAL = 0.1
 LOG_BATCH_SIZE = 10

@@ -26,6 +26,7 @@ MEDIA_LABELS = {
     "general": "Video",
 }
 YOUTUBE_DOMAINS = ("youtube.com", "youtu.be", "youtube-nocookie.com")
+# The domain whose session makes a jar worth using, per source.
 COOKIE_DOMAINS = {
     "instagram": "instagram.com", "youtube": "youtube.com",
     "ytmusic": "youtube.com", "tiktok": "tiktok.com",

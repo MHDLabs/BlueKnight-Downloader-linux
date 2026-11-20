@@ -151,7 +151,7 @@ class HTMLParserTests(unittest.TestCase):
     def test_pdf_parser_preserves_document_link_order(self):
         parser = PdfLinkParser()
         parser.feed('<a href="/one">one</a><embed src="/two">'
-                    '<iframe src="/three"><object data="/four">')
+                    '<iframe src="/three"></iframe><object data="/four"></object>')
         self.assertEqual(parser.links, ["/one", "/two", "/three", "/four"])
 
     def test_media_parser_reads_html5_meta_and_file_links(self):
