@@ -169,3 +169,16 @@ def plan_next_extractor_retry(kind, attempt, spent, challenge=False,
         }
 
     return None
+
+def plan_next_session_retry(spent, has_stored_session):
+    """Choose one session action: refresh a saved login, then inspect cookie jars."""
+    if has_stored_session and "refresh" not in spent:
+        return {"action": "refresh", "spent_key": "refresh"}
+    if "cookies" not in spent:
+        return {"action": "cookies", "spent_key": "cookies"}
+    return None
+
+
+def session_retry_attempt(attempt, cookie_source):
+    """Create a retry attempt with the selected, validated cookie source."""
+    return {**attempt, "cookies": cookie_source}

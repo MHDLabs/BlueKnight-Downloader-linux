@@ -47,6 +47,7 @@ from blueknight.media.fallback import (
     YOUTUBE_KINDS, YOUTUBE_MEDIA_DENIED, YOUTUBE_NO_FORMATS, YOUTUBE_SABR,
     YTDLP_TELLING_WARNING, classify_youtube_refusal as classify_youtube_refusal_policy,
     may_fall_back as may_fall_back_policy, plan_next_extractor_retry,
+    plan_next_session_retry, session_retry_attempt,
 )
 import pyshell
 
@@ -3004,24 +3005,33 @@ class SpotifyDownloader:
             return planned["attempt"]
 
         # The stored login outlives its cookies, because the site rotates them.
-        # If this app has ever signed in here, re-read the session before
-        # deciding there is none — it costs seconds and needs no one's attention.
+        # Refresh it once before looking for another readable session jar.
         site = cookie_site(kind)
         domain = cookie_domain_for(kind, url)
-        if site in SIGNIN_PAGES and "refresh" not in spent and read_registry().get(site):
-            spent.add("refresh")
-            self._batch_log(f"Refreshing the stored {MEDIA_LABELS.get(site, site)} session…",
-                            "warning")
+        has_stored_session = False
+        if site in SIGNIN_PAGES and "refresh" not in spent:
+            has_stored_session = bool(read_registry().get(site))
+
+        session_plan = plan_next_session_retry(spent, has_stored_session)
+        if session_plan and session_plan["action"] == "refresh":
+            spent.add(session_plan["spent_key"])
+            self._batch_log(
+                f"Refreshing the stored {MEDIA_LABELS.get(site, site)} session…",
+                "warning")
             self._flush_logs()
             if self.refresh_session(site, announce=False):
                 session = self.usable_cookies(domain, require_session=True)
                 if session:
                     self._batch_log("Retrying with the refreshed session.", "success")
                     self._flush_logs()
-                    return {**attempt, "cookies": session[0]}
+                    return session_retry_attempt(attempt, session[0])
 
-        if "cookies" not in spent:
-            spent.add("cookies")
+            # A refresh that produced no usable jar falls through to a normal
+            # signed-in cookie lookup, but neither operation will repeat.
+            session_plan = plan_next_session_retry(spent, has_stored_session=False)
+
+        if session_plan and session_plan["action"] == "cookies":
+            spent.add(session_plan["spent_key"])
             # Only a jar that actually holds this site's session can help here.
             session = self.usable_cookies(domain, require_session=True)
             if session:
@@ -3030,10 +3040,14 @@ class SpotifyDownloader:
                     f"Retrying with the {candidate_label(session[0])} session{suffix}.",
                     "warning")
                 self._flush_logs()
-                return {**attempt, "cookies": session[0]}
+                return session_retry_attempt(attempt, session[0])
             self._batch_log("No signed-in session for this site — skipping cookies.",
                             "warning")
 
+        return None
+
+    # ------------------------------------------------------------------
+    # Signing in, without an extension or a text file
         return None
 
     # ------------------------------------------------------------------

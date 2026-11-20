@@ -21,6 +21,7 @@ from blueknight.media.fallback import (
     classify_youtube_refusal,
     may_fall_back,
     plan_next_extractor_retry,
+    plan_next_session_retry, session_retry_attempt,
 )
 
 
@@ -279,3 +280,63 @@ class ExtractorRetryPlannerTests(unittest.TestCase):
         original = dict(attempt)
         plan_next_extractor_retry("youtube", attempt, set())
         self.assertEqual(attempt, original)
+
+class SessionRetryPlannerTests(unittest.TestCase):
+    def setUp(self):
+        self.attempt = {
+            "cookies": None,
+            "clients": "web",
+            "fresh": True,
+            "po_token": False,
+        }
+
+    def test_stored_session_refresh_precedes_cookie_lookup(self):
+        spent = set()
+        step = plan_next_session_retry(spent, has_stored_session=True)
+        self.assertEqual(step, {"action": "refresh", "spent_key": "refresh"})
+        self.assertEqual(spent, set())
+
+        spent.add(step["spent_key"])
+        step = plan_next_session_retry(spent, has_stored_session=True)
+        self.assertEqual(step, {"action": "cookies", "spent_key": "cookies"})
+
+    def test_missing_stored_session_skips_refresh(self):
+        self.assertEqual(
+            plan_next_session_retry(set(), has_stored_session=False),
+            {"action": "cookies", "spent_key": "cookies"},
+        )
+
+    def test_refresh_is_not_repeated_after_being_spent(self):
+        spent = {"refresh"}
+        self.assertEqual(
+            plan_next_session_retry(spent, has_stored_session=True),
+            {"action": "cookies", "spent_key": "cookies"},
+        )
+
+    def test_cookie_lookup_is_attempted_only_once(self):
+        spent = {"cookies"}
+        self.assertIsNone(plan_next_session_retry(spent, has_stored_session=False))
+        self.assertIsNone(plan_next_session_retry(spent, has_stored_session=True))
+
+    def test_refresh_failure_falls_through_to_cookie_lookup_once(self):
+        spent = {"refresh"}
+        step = plan_next_session_retry(spent, has_stored_session=False)
+        self.assertEqual(step["action"], "cookies")
+        spent.add(step["spent_key"])
+        self.assertIsNone(plan_next_session_retry(spent, has_stored_session=False))
+
+    def test_session_cookie_attempt_preserves_other_attempt_settings(self):
+        source = ("file", "/tmp/site-cookies.txt")
+        updated = session_retry_attempt(self.attempt, source)
+        self.assertEqual(updated["cookies"], source)
+        self.assertEqual(updated["clients"], "web")
+        self.assertTrue(updated["fresh"])
+        self.assertFalse(updated["po_token"])
+        self.assertIsNone(self.attempt["cookies"])
+
+    def test_session_retry_attempt_does_not_mutate_source(self):
+        source = ("browser", "firefox")
+        original = dict(self.attempt)
+        session_retry_attempt(self.attempt, source)
+        self.assertEqual(self.attempt, original)
+
