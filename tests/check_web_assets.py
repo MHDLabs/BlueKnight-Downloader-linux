@@ -27,6 +27,7 @@ class AssetParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.stylesheets: list[str] = []
         self.scripts: list[tuple[str | None, str]] = []
+        self.html_assets: list[str] = []
         self.style_blocks = 0
         self.inline_style_attributes = 0
         self.inline_event_attributes: list[str] = []
@@ -42,6 +43,11 @@ class AssetParser(HTMLParser):
         self.inline_event_attributes.extend(
             key for key in values if key.startswith("on") and len(key) > 2
         )
+
+        if tag in {"img", "source", "audio", "video"}:
+            reference = values.get("src") or values.get("poster")
+            if reference:
+                self.html_assets.append(reference)
 
         if tag == "style":
             self.style_blocks += 1
@@ -117,6 +123,9 @@ def main() -> int:
     for reference in script_refs:
         local_file(reference, WEB)
 
+    for reference in parser.html_assets:
+        local_file(reference, WEB)
+
     css_path = local_file(parser.stylesheets[0], WEB)
     css = css_path.read_text(encoding="utf-8")
     css_urls = re.findall(r"url\(\s*(['\"]?)(.*?)\1\s*\)", css, re.IGNORECASE)
@@ -130,6 +139,7 @@ def main() -> int:
     print(f"  stylesheet: {parser.stylesheets[0]}")
     for reference in script_refs:
         print(f"  script:     {reference}")
+    print(f"  HTML media assets: {len(parser.html_assets)} checked")
     print("  inline CSS/JavaScript/styles: none")
     print("  local CSS URLs: OK")
     return 0

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { Script } from "node:vm";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,14 +14,14 @@ const scripts = [
 const sources = scripts.map((path) => {
   const source = readFileSync(join(root, path), "utf8");
   // Parse each file on its own first, so syntax errors point to the right file.
-  new Function(source);
+  new Script(source, { filename: path });
   return source;
 });
 
 // Classic script tags share the page's global lexical scope. Parsing the files
 // together also catches duplicate top-level let/const/class declarations,
 // which individual node syntax checks cannot detect.
-new Function(sources.join("\n;\n"));
+new Script(sources.join("\n;\n"), { filename: "combined-classic-scripts.js" });
 
 console.log("Web JavaScript: OK");
 console.log("  all four scripts parse independently");
