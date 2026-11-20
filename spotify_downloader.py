@@ -3767,7 +3767,6 @@ class SpotifyDownloader:
             return False
 
         window = None
-        try:        window = None
         try:
             window = webview.create_window(
                 f"{kind.title()} session", url=SIGNIN_PAGES[kind][1][0],
