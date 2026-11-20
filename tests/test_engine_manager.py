@@ -246,7 +246,7 @@ class EngineManagerTests(unittest.TestCase):
             net_opener=lambda: nullcontext(opener),
             make_executable=lambda path: chmod_calls.append(Path(path)),
             process_runner=lambda command, timeout: SimpleNamespace(
-                returncode=0, stdout="1.2.3\\n"))
+                returncode=0, stdout="1.2.3"))
 
         result = manager.get_or_download_tool("demo", force=True, version="1.2.3")
 
