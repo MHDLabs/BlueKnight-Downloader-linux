@@ -56,15 +56,20 @@ have regression coverage.
 
 ## Phase 2 — Engine installation and lifecycle service
 
-**Status: Planned — next**
+**Status: Planned — next (wheel compatibility groundwork completed)**
 
-Extract tool discovery, native executable validation, version probing, download
-mirrors, checksums, installation, update staging and activation from
+The platform-specific Python wheel selector is already implemented in
+`blueknight/engines/wheels.py`. It matches PyPI wheel tags against the running
+interpreter and platform, and its tests cover Linux, Windows and universal
+wheels. This fixes the old Windows-only filter; it does not complete the
+manager extraction.
+
+Next, extract tool discovery, native executable validation, version probing,
+download mirrors, checksums, installation, update staging and activation from
 `spotify_downloader.py` into a dedicated engine manager under
 `blueknight/engines/`.
 
 Keep the existing UI-facing methods as thin adapters until callers migrate.
-Fix and test platform-specific wheel/asset selection as part of the extraction.
 Do not change the set of engines or their update sources without a separate,
 tested reason.
 
@@ -162,8 +167,8 @@ without reducing feature parity.
 
 ## Working rules
 
-- Work on `refactor/web-assets-modular`; do not merge to `blue-knight-net`
-  unless explicitly requested.
+- `main` is the maintained branch. Use a short-lived branch only when a PR
+  or parallel work is explicitly requested.
 - One responsibility per extraction, with tests before removing the old path.
 - Preserve all current engines, fallbacks and user-facing capabilities.
 - Avoid speculative rewrites and broad dependency replacement.

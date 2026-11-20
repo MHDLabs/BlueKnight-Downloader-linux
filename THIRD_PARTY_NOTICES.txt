@@ -61,8 +61,9 @@ Copyright (c) Team NewPipe and contributors
 Licensed under GNU GPL version 3 or later.
 Project and corresponding source:
 https://github.com/TeamNewPipe/NewPipeExtractor/tree/v0.26.1
-Bundled in the Android app as a fallback resolver for YouTube, YouTube Music,
-SoundCloud, Bandcamp, PeerTube, and media.ccc.de after yt-dlp fails.
+Bundled as a desktop JVM helper under jvm/newpipe. It is a fallback resolver
+for supported sources including YouTube, YouTube Music, SoundCloud, Bandcamp,
+PeerTube and media.ccc.de after yt-dlp exhausts its useful retries.
 
 img2pdf
 -------
@@ -104,10 +105,12 @@ version by rebuilding that sidecar.
 
   https://github.com/Tyrrrz/YoutubeExplode
 
-The behaviour this engine relies on — visitor-data resolution, the ANDROID_VR
-innertube client, the TV-embedded fallback, signature deciphering and the
-stream request handling — is the library's own, deliberately, so that updating
-the package is what keeps the engine working when YouTube changes.
+The behaviour this engine relies on — visitor-data resolution, YouTube's
+android_vr Innertube client identifier, the TV-embedded fallback, signature
+deciphering and stream request handling — is the library's own, deliberately,
+so that updating the package is what keeps the engine working when YouTube
+changes. The android_vr name is an extractor client identifier, not an Android
+application target.
 
 --------------------------------------------------------------------------
 YouTube.js (youtubei.js)
@@ -115,26 +118,12 @@ YouTube.js (youtubei.js)
 Copyright (c) LuanRT
 Licensed under the MIT License.
 
-Used as an additional YouTube engine — fourth on the desktop, third on
-Android. The library is fetched at build time as its published ESM bundle and
-loaded as-is; none of its source is copied into this application. The desktop
-runs it under the Deno already shipped for yt-dlp's challenge solver, and
-Android runs the same script inside a WebView.
+Used as an additional YouTube engine on the desktop. The library is fetched
+at build time as its published ESM bundle and loaded as-is; none of its source
+is copied into this application. It runs under the Deno runtime already shipped
+for yt-dlp's JavaScript challenge solver.
 
   https://github.com/LuanRT/YouTube.js
-
---------------------------------------------------------------------------
-NewPipeExtractor
---------------------------------------------------------------------------
-Copyright (c) Team NewPipe
-Licensed under the GNU General Public License v3.0.
-
-Used as a YouTube engine — second on Android, third on the desktop. It is
-called through its published API from a helper that runs as its own process,
-and none of its source is copied into this application. The Android build
-reaches the same library through the app's own JVM.
-
-  https://github.com/TeamNewPipe/NewPipeExtractor
 
 --------------------------------------------------------------------------
 BgUtils (bgutils-js)

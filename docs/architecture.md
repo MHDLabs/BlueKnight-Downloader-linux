@@ -26,10 +26,12 @@ The current desktop path is:
    queue and the page updates progress, status, logs and controls.
 5. The application launches or coordinates the existing media and conversion tools.
 
-The large Python file is approximately 6,247 lines and currently contains a
-SpotifyDownloader class with 112 methods, plus the desktop Api adapter and
-module-level helpers. blueknight_paths.py and pyshell.py already isolate some
-path/cookie and process-launch behaviour.
+The Python desktop engine is still a large compatibility surface: the
+SpotifyDownloader class, desktop Api adapter and module-level helpers remain
+concentrated in spotify_downloader.py. blueknight_paths.py and pyshell.py
+already isolate application paths, cookie discovery and process-launch
+behaviour. Exact line and method counts are intentionally omitted because they
+change during routine maintenance.
 
 ## Frontend layout
 
@@ -84,16 +86,12 @@ The first network extraction is implemented:
   and older helper scripts retain their import surface.
 - `tests/test_network_proxy.py` covers URL validation, redaction, proxy
   environment variables and a loopback SOCKS5 tunnel.
-- The UI-facing settings, reachability checks and proxy test workflow remain in
-  `SpotifyDownloader` for now; they are the next boundary to extract after the
-  isolated helper module is exercised in CI.
-
-
-The UI-facing proxy controller has now been moved behind `ProxyManager` in
-`blueknight/network/proxy.py`. It receives settings and UI callbacks from the
-application, owns connection checks and urllib opener lifetimes, and leaves
-`SpotifyDownloader` with thin compatibility methods. The application’s
-self-test still imports the legacy process-proxy helper through the same module.
+- `ProxyManager` in `blueknight/network/proxy.py` owns connection checks and
+  urllib opener lifetimes through injected settings and UI callbacks.
+- `SpotifyDownloader` retains thin UI-facing compatibility methods; the
+  existing WebView bridge does not need to change for this extraction.
+- The application self-test still imports the legacy process-proxy helper
+  through the same module.
 
 ## Engine catalog extraction
 
@@ -102,9 +100,16 @@ versions, OS-specific assets, release mirrors, FFmpeg archives, the optional
 PO-token provider and the `TOOLS` registry. `spotify_downloader.py` imports
 these names as compatibility exports.
 
-This extraction does not remove or replace any engine. Downloading, validation,
-checksum checks and activation remain in the application service until their
-own module boundary is extracted.
+Python wheel matching is separated into `blueknight/engines/wheels.py`. It
+uses the ordered compatibility tags supplied by `packaging` rather than
+hard-coded Windows filename fragments, so Linux manylinux/musllinux wheels,
+Windows wheels and universal wheels are selected against the running runtime.
+The five deterministic tests simulate Linux and Windows tag sets without
+claiming that Windows CI is active.
+
+These are focused boundaries, not a complete engine manager. Downloading,
+native executable validation, version probing, checksum checks, installation
+and activation still remain in the application service. No engine was removed.
 
 ## Intended module boundaries
 
@@ -154,13 +159,13 @@ startup time and process/runtime requirements.
 ## Migration order
 
 1. **Frontend assets:** split HTML, CSS and JavaScript without changing the UI.
-   Completed on refactor/web-assets-modular.
+   Completed; the current assets live under web/ and are loaded from the local WebView page.
 2. **Bridge contract:** record and test the current API signatures and event names.
    Completed in contracts/desktop-bridge-v1.json.
 3. **Regression baseline:** add tests/fixtures for queue events, process exit,
    cancellation, proxy handling, engine selection and representative downloads.
 4. **Python extraction:** move one responsibility at a time behind the existing
-   SpotifyDownloader and Api facades. Keep Windows working.
+   SpotifyDownloader and Api facades. Preserve the retained Windows packaging path; its automated CI is paused.
 5. **Rust core:** introduce Rust modules behind the same contract and test each
    service with deterministic fixtures and fake engine processes.
 6. **Desktop integration:** replace the Python desktop host only after Linux and
@@ -175,7 +180,10 @@ change, verify:
 - all 27 bridge methods and the shared event contract still match;
 - existing download engines and fallback order remain available;
 - stop/cancel, proxy, sign-in, cookies, conversion and update operations work;
-- Linux and Windows package builds still complete;
+- Linux package build and frozen smoke test pass in active CI;
 - the visible UI has no unintended layout or interaction change.
+- Windows compatibility remains represented by the retained build script; do
+  not claim automated Windows coverage until its CI runner is resumed.
+
 
 This fork does not include a mobile application target.
