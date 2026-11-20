@@ -2,12 +2,12 @@
 
 # ⚔️ Blue Knight Downloader
 
-### Portable media downloader for Spotify, YouTube, TikTok, and Instagram
+### Portable desktop downloader for Spotify, YouTube, TikTok, and Instagram
 
 **One executable. No installation. No complicated setup.**
 
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows)](#system-requirements)
-[![Platform](https://img.shields.io/badge/Platform-64--bit-blue)](#system-requirements)
+[![Linux](https://img.shields.io/badge/Linux-64--bit-FCC624?logo=linux)](#system-requirements)
 [![Portable](https://img.shields.io/badge/Build-Portable-success)](#portable-usage)
 [![Version](https://img.shields.io/badge/Version-1.0-purple)](#whats-new-in-v1.0)
 
@@ -17,7 +17,7 @@
 
 ## Overview
 
-**Blue Knight Downloader** is a portable Windows application for downloading media from:
+**Blue Knight Downloader** is a portable desktop application for Windows and Linux, built to download media from:
 
 - 🎵 Spotify
 - ▶️ YouTube
@@ -43,12 +43,13 @@ Download supported content from four major platforms:
 | TikTok | Videos and supported posts |
 | Instagram | Reels, posts, profiles, and supported media |
 
-### Portable Windows application
+### Portable desktop packages
 
-- No installation required
-- No separate Python installation
-- Can be moved between folders or compatible Windows computers
-- All required application files are included in the portable package
+- No traditional installation or separate Python setup is required.
+- Windows releases are distributed as a portable ZIP archive.
+- Linux releases are distributed as a portable TAR.GZ archive.
+- Extract the package and keep its bundled files together.
+- The Linux desktop window uses the system WebKitGTK 4.1 runtime; the archive does not bundle a complete browser engine.
 
 ### Built-in authentication
 
@@ -221,21 +222,25 @@ The application now includes redesigned platform pages, dynamic colors, light mo
 
 ## Installation
 
-Blue Knight Downloader does not require a traditional installation.
+No traditional installer is required.
 
-1. Download the latest ZIP package from the Releases page.
-2. Extract the entire ZIP archive.
-3. Keep all extracted files together.
-4. Open:
+**Windows**
 
-```text
-BlueKnightDownloader.exe
-```
+1. Download the Windows ZIP from the Releases page.
+2. Extract the entire archive.
+3. Run `BlueKnightDownloader.exe`.
+
+**Linux**
+
+1. Download the Linux TAR.GZ package from the Releases page.
+2. Extract the archive.
+3. Make sure WebKitGTK 4.1 and the required GTK runtime libraries are installed.
+4. Run `./BlueKnightDownloader` from the extracted folder.
 
 > [!IMPORTANT]
-> Do not run the executable directly from inside the ZIP archive.
-
----
+> Do not run the program from inside the compressed archive. On Linux, the
+> WebKitGTK runtime is provided by the host distribution and is not bundled
+> into the portable archive.
 
 ## Basic Usage
 
@@ -342,32 +347,36 @@ Use the proxy address shown inside your proxy client.
 
 ## Portable Usage
 
-Keep the executable and bundled application files in the same extracted folder.
+The Windows ZIP and Linux TAR.GZ are no-installer packages. Extract the archive
+and keep the executable and its bundled application files together.
 
-You can move the complete folder to:
+The extracted directory can be moved to another folder, disk or USB drive, as
+long as the destination is writable and the required system libraries are
+available. Linux requires WebKitGTK 4.1 at runtime.
 
-- Another directory
-- Another disk
-- A USB drive
-- Another compatible Windows computer
-
-Do not move only the executable unless the build is explicitly distributed as a single-file package.
+"Portable" describes the application package, not a promise that every piece of
+user data stays inside that directory. Downloads and exported authentication
+cookies are stored alongside the application; updateable components and other
+writable application data may use the operating system's per-user data directory.
 
 ---
 
 ## System Requirements
 
-- Windows 10 or Windows 11
-- 64-bit operating system
-- Internet connection
-- Sufficient free storage for downloaded media
+**Windows**
+- Windows 10 or Windows 11, 64-bit
+- Microsoft Edge WebView2 Runtime for in-app authentication
+- Internet connection and sufficient free storage
 
-Recommended:
+**Linux**
+- 64-bit Linux distribution with a compatible glibc runtime
+- WebKitGTK 4.1 and GTK runtime libraries
+- Internet connection and sufficient free storage
 
+Recommended on either platform:
 - At least 4 GB of RAM
-- Modern multi-core processor
+- A modern multi-core processor
 - Stable internet connection
-- Updated Microsoft Edge WebView2 Runtime for in-app authentication
 
 ---
 

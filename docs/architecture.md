@@ -7,8 +7,8 @@
 
 - **Primary target:** Linux desktop.
 - **Compatibility target:** Windows desktop must continue to work throughout the refactor.
-- **Android:** retained in the repository, but Android-specific implementation work is
-  outside this desktop refactor and is left to the original maintainer.
+- **Platform scope:** this fork ships desktop builds only. Mobile application
+  code is not part of the maintained product.
 - **Feature policy:** one complete application. Existing engines and user-facing
   capabilities are not removed to make packaging smaller.
 - **UI policy:** preserve the current interface and its behaviour while the internals
@@ -51,8 +51,6 @@ contracts/desktop-bridge-v1.json records the current frontend-to-engine boundary
 
 - 27 API methods, including their argument names.
 - The event names emitted by the desktop engine and consumed by the page.
-- The existing Android-only progress event, which is not part of the desktop UI
-  event set.
 
 The bridge is a migration boundary, not an implementation detail to casually
 change. A new Python module or Rust service should continue to satisfy this
@@ -179,4 +177,4 @@ change, verify:
 - Linux and Windows package builds still complete;
 - the visible UI has no unintended layout or interaction change.
 
-The Android implementation is not modified by this plan.
+This fork does not include a mobile application target.

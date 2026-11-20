@@ -718,7 +718,7 @@ def write_netscape_jar(cookies, path):
 
 
 # Reading the clipboard is the one thing every desktop does through a different
-# program. Android has no command for it at all and answers in the shell instead.
+# program.
 CLIPBOARD_READERS = {
     "win": (["powershell", "-NoProfile", "-Command", "Get-Clipboard -Raw"],),
     "mac": (["pbpaste"],),
@@ -726,7 +726,6 @@ CLIPBOARD_READERS = {
     # X11 selection, while wl-paste is absent on a pure X11 one and falls through.
     "linux": (["wl-paste", "--no-newline"], ["xclip", "-selection", "clipboard", "-o"],
               ["xsel", "--clipboard", "--output"]),
-    "android": (),
 }
 
 
@@ -743,14 +742,12 @@ def read_clipboard():
     return ""
 
 
-# Writing takes a different program from reading on every desktop. Android has
-# neither and answers in the shell, which owns the ClipboardManager.
+# Writing takes a different program from reading on every desktop.
 CLIPBOARD_WRITERS = {
     "win": (["clip"],),
     "mac": (["pbcopy"],),
     "linux": (["wl-copy"], ["xclip", "-selection", "clipboard"],
               ["xsel", "--clipboard", "--input"]),
-    "android": (),
 }
 
 
@@ -1457,7 +1454,7 @@ class SpotifyDownloader:
 
         A mirror that answers a download with a login page or a 404 body still
         writes a file of plausible size, so the first bytes are checked against
-        the executable formats: PE on Windows, ELF on Linux and Android, and
+        the executable formats: PE on Windows, ELF on Linux, and
         Mach-O — thin or universal, either byte order — on macOS.
         """
         magics = (b"MZ",) if IS_WINDOWS else (
@@ -1976,14 +1973,6 @@ class SpotifyDownloader:
         """What --ffmpeg-location can actually be handed.
 
         yt-dlp looks a program up by file name inside the folder it is given.
-        On Android the packaged binaries are named libffmpeg.so and
-        libffprobe.so — a packaging rule, not a format — so the folder only
-        answers once the shims exist there under the real names. Passing the
-        native library folder regardless, which is what this did, meant yt-dlp
-        found no ffmpeg at all: every merge of a separate video and audio
-        stream, and every MP3 extraction, would have failed with the tool
-        reported missing.
-
         Return the folder when ffmpeg and ffprobe share one; otherwise return
         the explicit ffmpeg path.
         """
@@ -1999,12 +1988,8 @@ class SpotifyDownloader:
         This is not optional for YouTube. Its media URLs are signed by a
         JavaScript challenge, and without an engine to run it yt-dlp falls back
         to its own interpreter, which current player versions defeat — the
-        unsigned URL then comes back as HTTP 403 Forbidden. That is exactly the
-        Android-only failure, because Deno publishes no Android build and the
-        flag was simply never passed there.
-
-        QuickJS is the answer on the phone: one small C interpreter that
-        cross-compiles with the NDK, and one yt-dlp supports by name.
+        unsigned URL then comes back as HTTP 403 Forbidden. The desktop build
+        bundles Deno and passes it to yt-dlp for challenge solving.
         """
         if self.deno_cmd and Path(self.deno_cmd).is_file():
             return "deno", self.deno_cmd

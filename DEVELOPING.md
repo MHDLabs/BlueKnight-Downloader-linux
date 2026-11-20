@@ -5,7 +5,7 @@ TikTok, Instagram, SoundCloud, X, PDF/ebook documents, and other
 yt-dlp-supported video sites**, sorting what it fetches, and handling restricted
 networks and common sign-in walls.
 
-The desktop builds target Windows and Linux, with a macOS build also maintained.
+The maintained desktop targets are Linux and Windows. Linux is the primary development target; Windows compatibility is checked in CI.
 The downloader currently uses a Python engine and a local WebView interface.
 The interface is split into HTML, CSS and ordered JavaScript files; the engine
 and platform packaging are being modularized without dropping existing features.
@@ -20,8 +20,8 @@ Python updates on restart.
 
 ## Run it
 
-1. Extract the whole folder. Do not run the `.exe` from inside the ZIP.
-2. Open `SpotifyDownloader.exe`.
+1. Extract the full Windows ZIP or Linux TAR.GZ package.
+2. Run `BlueKnightDownloader.exe` on Windows or `./BlueKnightDownloader` on Linux.
 3. Pick a source in the sidebar, paste a link, press **Download**.
 
 Built for 64-bit Windows 10 and 11. Internet access is still needed to resolve
@@ -51,7 +51,7 @@ is not a failure - it is a job for a different engine, so the X and **Video**
 pages fall through automatically:
 
 1. **yt-dlp** - video, everywhere it has an extractor.
-2. **NewPipeExtractor (Android)** - a native fallback for YouTube, YouTube
+2. **NewPipeExtractor (JVM helper)** - a desktop fallback for YouTube, YouTube
    Music, SoundCloud, Bandcamp, PeerTube and media.ccc.de after yt-dlp exhausts
    its extractor/client retries.
 3. **Streamlink** - live and HLS streams on its supported services.
@@ -60,11 +60,10 @@ pages fall through automatically:
 6. **direct download** - the link treated as the file itself, using neither
    yt-dlp nor ffmpeg.
 
-The hand-off is silent. NewPipeExtractor is also tried for Android extraction,
-format, sign-in or media-delivery failures after yt-dlp's useful retries are
-spent; the generic engines are used when yt-dlp reports that there is no video
-at the link. A genuine DRM failure stops where it happened rather than being
-retried pointlessly. The engines use the app's proxy and Stop button.
+The hand-off is silent. NewPipeExtractor is also tried on desktop after yt-dlp's
+useful retries are spent. The generic engines are used when yt-dlp reports that
+there is no video at the link. A genuine DRM failure stops where it happened
+rather than being retried pointlessly. The engines use the app's proxy and Stop button.
 
 For a General-site bot check, CAPTCHA, or HTTP 401/403 response, yt-dlp gets a
 separate challenge ladder before engine hand-off: the bundled Deno runtime,
@@ -245,40 +244,31 @@ engines current is important.
 
 ## Building from source
 
+**Windows**
+
 ```powershell
-cd spoty
-.\build_portable.ps1
+.uild_portable.ps1
 ```
 
-Needs Python 3.12. The build script fetches any missing command-line tools and
-creates `release/SpotifyDownloader.exe` plus
-`release/BlueKnightDownloader-windows-x64.zip`.
-
-Linux and macOS use `bash ./build_portable.sh`. Android uses the Gradle project:
+**Linux**
 
 ```bash
-cd spoty/android
-./gradlew lintRelease testReleaseUnitTest assembleRelease
+bash ./build_portable.sh
 ```
 
-The universal Android build embeds the same Python engine and web interface,
-Python runtimes and locally built FFmpeg/FFprobe executables for `arm64-v8a`,
-`armeabi-v7a`, `x86` and `x86_64`. Smaller single-ABI APKs can be built with
-`./gradlew -PtargetAbi=arm64-v8a assembleRelease` (replace the ABI as needed).
-Its system pickers
-import media and documents without broad storage permission; completed files are
-also copied to the folder selected in the app. Modern DOCX/XLSX/PPTX,
-OpenDocument, EPUB/FB2, text, image and PDF conversions run on-device. Legacy
-binary Office and Kindle formats still require LibreOffice or Calibre on desktop.
+Both desktop builds use Python 3.12. The scripts fetch or prepare the required
+command-line tools and create a portable package under `release/`:
 
-CI builds Windows x64, Linux x64, macOS ARM64, one universal Android APK and
-four single-ABI Android APKs on every downloader change. A tag named
-`downloader-v6.8.7` publishes all eight artifacts.
-Dedicated Android signing
-uses `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` and
-`ANDROID_KEY_PASSWORD` repository secrets. When those are absent, this repository
-reuses its existing WhiteBooster release signer so APK upgrades keep a stable
-certificate instead of receiving a new CI debug key on every build.
+- Windows: `BlueKnightDownloader-windows-x64.zip`
+- Linux: `BlueKnightDownloader-linux-x64.tar.gz`
+
+The Linux build needs the WebKitGTK 4.1 and GTK development packages. The
+resulting Linux archive does not bundle WebKitGTK; the matching runtime
+libraries must be installed on the target system. A JDK 17 and .NET 8 SDK are
+used to build the NewPipe and YoutubeExplode fallback helpers when available.
+
+CI validates Windows x64 and Linux x64 builds. Tags named
+`downloader-v*` or `Blueknightv*` publish the desktop ZIP and TAR.GZ artifacts.
 
 | File | Role |
 | --- | --- |
@@ -291,8 +281,7 @@ certificate instead of receiving a new CI debug key on every build.
 | `tests/check_web_assets.py` | local HTML/CSS asset reference checks |
 | `tests/check_web_scripts.mjs` | JavaScript syntax and shared-binding checks |
 | `build_portable.ps1` | Windows desktop build |
-| `build_portable.sh` | Linux/macOS desktop build |
-| `android/` | existing Android project, outside the current desktop refactor |
+| `build_portable.sh` | Linux desktop build |
 
 `blueknight_paths.py` runs its own checks with `python blueknight_paths.py`.
 

@@ -163,10 +163,5 @@
     "total",
     "track",
     "updating"
-  ],
-  "platform_specific_events": {
-    "android": [
-      "progress"
-    ]
-  }
+  ]
 }

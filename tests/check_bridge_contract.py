@@ -123,23 +123,16 @@ def main() -> int:
         )
 
     emitted = emitted_events(python_source)
-    platform_events = {
-        event
-        for events in contract.get("platform_specific_events", {}).values()
-        for event in events
-    }
-    if emitted != expected_events | platform_events:
+    if emitted != expected_events:
         raise AssertionError(
             f"Python event output differs from contract. "
-            f"Missing={sorted((expected_events | platform_events) - emitted)}; "
-            f"unexpected={sorted(emitted - (expected_events | platform_events))}"
+            f"Missing={sorted(expected_events - emitted)}; "
+            f"unexpected={sorted(emitted - expected_events)}"
         )
 
     print(f"Desktop bridge contract v{contract['version']}: OK")
     print(f"  API methods and signatures: {len(expected_api)}")
     print(f"  shared UI events: {len(expected_events)}")
-    if platform_events:
-        print(f"  platform-specific events: {', '.join(sorted(platform_events))}")
     return 0
 
 
