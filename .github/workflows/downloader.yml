@@ -33,8 +33,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
       - name: Path and platform checks
 
@@ -51,21 +51,21 @@ jobs:
           - { os: ubuntu-24.04,     target: linux-x64 }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
 
       # The desktop's second YouTube engine is a .NET sidecar. The build
       # scripts skip it when no SDK is present, so without this the packages
       # would still build and quietly ship one engine short.
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with: { dotnet-version: "8.0.x" }
 
       # The NewPipe engine is a JVM library, so the desktop carries a helper
       # and a runtime trimmed with jlink. Without a JDK the build skips it and
       # would ship one engine short without saying so.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: "17" }
 
       - name: Install Python dependencies
@@ -102,7 +102,7 @@ jobs:
 
         run: ./release/BlueKnightDownloader --self-test
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: blueknight-${{ matrix.target }}
           path: |
@@ -115,11 +115,11 @@ jobs:
     if: (startsWith(github.ref, 'refs/tags/downloader-v') || startsWith(github.ref, 'refs/tags/Blueknightv'))
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
           merge-multiple: true
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             artifacts/*.zip
