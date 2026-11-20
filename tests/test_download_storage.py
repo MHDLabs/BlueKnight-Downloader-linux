@@ -2,6 +2,7 @@
 
 import contextlib
 import errno
+import ssl
 import sys
 import tempfile
 import types
@@ -13,6 +14,13 @@ from unittest import mock
 # These tests exercise the download methods without opening a desktop window.
 # The frontend-check runner is headless and does not install a native WebView backend.
 sys.modules.setdefault("webview", types.ModuleType("webview"))
+try:
+    import certifi  # noqa: F401
+except ImportError:
+    certifi_stub = types.ModuleType("certifi")
+    certifi_stub.where = lambda: (
+        ssl.get_default_verify_paths().cafile or "/etc/ssl/certs/ca-certificates.crt")
+    sys.modules["certifi"] = certifi_stub
 
 from spotify_downloader import SpotifyDownloader
 
