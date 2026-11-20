@@ -315,6 +315,13 @@ class SessionRetryPlannerTests(unittest.TestCase):
 
     def test_cookie_lookup_is_attempted_only_once(self):
         spent = {"cookies"}
+        # A stored login may still be refreshed even after the ordinary cookie
+        # lookup has been spent; refresh is a distinct, higher-priority action.
+        self.assertEqual(
+            plan_next_session_retry(spent, has_stored_session=True),
+            {"action": "refresh", "spent_key": "refresh"},
+        )
+        spent.add("refresh")
         self.assertIsNone(plan_next_session_retry(spent, has_stored_session=False))
         self.assertIsNone(plan_next_session_retry(spent, has_stored_session=True))
 
@@ -339,4 +346,3 @@ class SessionRetryPlannerTests(unittest.TestCase):
         original = dict(self.attempt)
         session_retry_attempt(self.attempt, source)
         self.assertEqual(self.attempt, original)
-
