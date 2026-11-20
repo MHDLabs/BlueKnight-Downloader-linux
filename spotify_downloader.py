@@ -22,7 +22,6 @@ import zipfile
 import ssl
 import urllib.request
 import urllib.error
-import tarfile
 import tempfile
 import io
 from html.parser import HTMLParser
@@ -47,6 +46,7 @@ TELEGRAM_URL = "https://t.me/BlueKnight_Net"
 
 from blueknight.engines.wheels import select_compatible_wheel
 from blueknight.engines.manager import EngineManager
+from blueknight.engines.ffmpeg import FFmpegInstaller, extract_binaries
 from blueknight.engines.catalog import (
     BGUTIL_DOWNLOAD_URLS, BGUTIL_PLUGIN_URL, DENO_ASSETS,
     DENO_DOWNLOAD_URLS, FFMPEG_DOWNLOADS, SPOTDL_ASSETS,
@@ -858,53 +858,6 @@ def make_executable(path):
         path.chmod(path.stat().st_mode | 0o755)
 
 
-def extract_binaries(archive_path, wanted):
-    """Pull named programs out of a release archive.
-
-    wanted maps a bare program name to where it should land. Members are matched
-    on their base name rather than a full path, because the same binary sits at
-    `ffmpeg-.../bin/ffmpeg` in one project's archive and at the root of another's.
-    Each member is streamed rather than fully extracted, which verifies that
-    member's checksum without inflating the rest of a large distribution.
-    """
-    archive_path = Path(archive_path)
-    targets = {name.lower(): Path(target) for name, target in wanted.items()}
-    found = set()
-
-    def base(member):
-        return Path(member.replace("\\", "/")).name.lower()
-
-    def claim(member, opener):
-        stem, suffix = os.path.splitext(base(member))
-        # An archive also ships documentation, and `doc/ffmpeg.html` has the
-        # same stem as the program. Only a program-shaped name qualifies.
-        if suffix not in ("", ".exe"):
-            return
-        target = targets.get(stem)
-        if target is None or stem in found:
-            return
-        with opener() as source, target.open("wb") as output:
-            shutil.copyfileobj(source, output, length=1024 * 1024)
-        found.add(stem)
-
-    if zipfile.is_zipfile(archive_path):
-        with zipfile.ZipFile(archive_path) as archive:
-            for member in archive.namelist():
-                claim(member, lambda m=member: archive.open(m))
-    else:
-        # tarfile picks the compression itself, which is what makes the same
-        # call work for the .tar.xz Linux builds and any .tar.gz mirror.
-        with tarfile.open(archive_path) as archive:
-            for member in archive.getmembers():
-                if member.isfile():
-                    claim(member.name,
-                          lambda m=member: contextlib.closing(archive.extractfile(m)))
-
-    missing = sorted(set(targets) - found)
-    if missing:
-        raise RuntimeError(
-            f"{archive_path.name} is missing {', '.join(missing)}")
-
 
 # Proxy helpers live in their own module. These names stay imported here so the
 # existing desktop engine and compatibility scripts keep their public surface.
@@ -953,6 +906,13 @@ class SpotifyDownloader:
             engine_update_root=ENGINE_UPDATE_ROOT,
             engine_update_registry=ENGINE_UPDATE_REGISTRY,
             wheel_selector=select_compatible_wheel)
+        self.ffmpeg_installer = FFmpegInstaller(
+            FFMPEG_DOWNLOADS[OS_TAG], self.app_data, self.ffmpeg_dir, self.ffmpeg_exe,
+            executable_suffix=EXE,
+            download_with_fallbacks=self._download_with_fallbacks,
+            ui_callback=self.ui, make_executable=make_executable,
+            is_native_executable=self._is_native_executable,
+            tool_version=self.tool_version)
         self.spotdl_exe = self.tools_dir / f"spotdl{EXE}"
 
         # Proxy settings with proper defaults for v2rayN
@@ -1668,44 +1628,7 @@ class SpotifyDownloader:
             except Exception:
                 pass
 
-        archives = FFMPEG_DOWNLOADS[OS_TAG]
-        if not archives:
-            raise RuntimeError(
-                "FFmpeg is not downloadable on this platform and none is bundled.")
-
-        archive_path = self.app_data / "ffmpeg.archive.new"
-        try:
-            self.app_data.mkdir(parents=True, exist_ok=True)
-            self.ffmpeg_exe.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.TemporaryDirectory(dir=self.ffmpeg_dir) as temp:
-                stage = Path(temp)
-                # Both binaries are staged and launch-checked before either is
-                # activated, so a half-downloaded pair can never replace a
-                # working one.
-                for wanted, urls in archives:
-                    archive_path.unlink(missing_ok=True)
-                    self._download_with_fallbacks(urls, archive_path, "FFmpeg")
-                    self.ui("setup", "Extracting FFmpeg...", "Setting up audio converter")
-                    extract_binaries(archive_path,
-                                     {name: stage / f"{name}{EXE}" for name in wanted})
-                for name in ("ffmpeg", "ffprobe"):
-                    candidate = stage / f"{name}{EXE}"
-                    make_executable(candidate)
-                    if (not self._is_native_executable(candidate)
-                            or self.tool_version(candidate) == "unknown"):
-                        raise RuntimeError(
-                            f"The downloaded {candidate.name} did not pass its launch check")
-
-                # ffmpeg is the activation point and is replaced last. A failure
-                # before this line leaves every running download and the prior
-                # executable untouched.
-                os.replace(stage / f"ffprobe{EXE}", self.ffmpeg_dir / "bin" / f"ffprobe{EXE}")
-                os.replace(stage / f"ffmpeg{EXE}", self.ffmpeg_exe)
-            return str(self.ffmpeg_exe)
-        except Exception as e:
-            raise RuntimeError(f"FFmpeg setup failed: {e}")
-        finally:
-            archive_path.unlink(missing_ok=True)
+        return self.ffmpeg_installer.install()
 
     def bgutil_args(self):
         """yt-dlp arguments that let it mint a proof-of-origin token, or [].

@@ -1,8 +1,7 @@
-"""Low-level discovery and validation for the external desktop engines.
+"""Discovery, validation and update services for external desktop engines.
 
-Installation and update orchestration remain in the application service for
-now. This module owns the deterministic parts that can be tested separately:
-native executable validation, tool lookup order and version probing.
+The manager owns native-tool and Python-wheel lifecycle operations. App-specific
+child-process compatibility checks remain in the desktop application layer.
 """
 
 from __future__ import annotations
