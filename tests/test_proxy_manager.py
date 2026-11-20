@@ -111,15 +111,14 @@ class ProxyManagerTests(unittest.TestCase):
 
     def test_network_opener_has_no_proxy_when_disabled(self):
         self.settings["enabled"] = False
-        # urllib installs its own default ProxyHandler. With the environment
-        # cleared, that default handler must remain empty when app proxy is off.
+        # With the environment cleared, urllib has no reason to add a proxy
+        # handler when the application's own proxy setting is disabled.
         with patch.dict(os.environ, {}, clear=True):
             with self.manager.net_opener() as opener:
-                handler = next(
-                    item for item in opener.handlers
-                    if isinstance(item, urllib.request.ProxyHandler)
-                )
-                self.assertEqual(handler.proxies, {})
+                self.assertFalse(any(
+                    isinstance(item, urllib.request.ProxyHandler)
+                    for item in opener.handlers
+                ))
 
     def test_spotdl_adapter_does_not_create_bridge_for_http(self):
         proxy, bridge = self.manager.prepare_for_spotdl(
