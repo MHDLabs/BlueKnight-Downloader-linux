@@ -48,6 +48,17 @@ class FakeResponse:
         return b""
 
 
+class EmptyMediaResponse:
+    def __init__(self, content_length=None):
+        self.headers = Message()
+        self.headers["Content-Type"] = "video/mp4"
+        if content_length is not None:
+            self.headers["Content-Length"] = str(content_length)
+
+    def read(self, _size):
+        return b""
+
+
 class DownloadStorageTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -71,6 +82,19 @@ class DownloadStorageTests(unittest.TestCase):
                 1, 1, suffix=".mp4", name_hint="video.mp4")
 
         self.assertEqual(list(self.output.iterdir()), [])
+
+    def test_empty_media_response_is_not_saved(self):
+        # Exercise both an explicit zero-length response and a response whose
+        # server omitted Content-Length entirely.
+        for content_length in (0, None):
+            with self.subTest(content_length=content_length):
+                response = EmptyMediaResponse(content_length)
+                result = self.app._save_stream(
+                    response, self.output, "https://media.example/video.mp4",
+                    1, 1, suffix=".mp4", name_hint="video.mp4")
+
+                self.assertIsNone(result)
+                self.assertEqual(list(self.output.iterdir()), [])
 
     def test_storage_failure_aborts_resolved_media_batch_and_cleans_partial(self):
         response = FakeResponse(

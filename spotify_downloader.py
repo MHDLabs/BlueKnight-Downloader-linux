@@ -1721,6 +1721,10 @@ class SpotifyDownloader:
         number, so there the guard is only that it must not be a web page.
         """
         head = response.read(max(len(expect), 512) if expect else 512)
+        # An empty body is EOF, not a valid media file. Reject it before
+        # creating a destination or reporting a successful download.
+        if not head:
+            return None
         if expect:
             if not head.startswith(expect):
                 return None

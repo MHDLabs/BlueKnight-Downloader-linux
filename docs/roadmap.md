@@ -59,7 +59,7 @@ have regression coverage.
 
 ## Phase 2 — Engine installation and lifecycle service
 
-**Status: Implementation complete — Linux package verification in progress**
+**Status: Implementation complete — automated Linux package verification passed**
 
 The platform-specific Python wheel selector lives in
 `blueknight/engines/wheels.py`. It matches PyPI wheel tags against the running
@@ -81,9 +81,11 @@ replacement, and a failed second replacement rolls back the first.
 
 Focused tests now cover the wheel lifecycle, FFmpeg ZIP/TAR extraction,
 platform-specific split archives, failed validation, and pair rollback. The
-latest Web CI run reports 78 passing Python tests; the Linux package build and
-frozen smoke test are checked separately below. Do not change the set of
-engines or their update sources without a separate, tested reason.
+Web workflow verifies the Python regression suite; the Linux workflow builds
+the package, runs the frozen smoke test and publishes the Linux artifact.
+These automated checks do not replace the real desktop GUI validation listed
+in Phase 1. Do not change the set of engines or their update sources without
+a separate, tested reason.
 
 **Exit criteria:** the engine lifecycle services have focused tests, the Linux
 package and frozen smoke test pass, and the GUI still reports, installs,
