@@ -144,7 +144,7 @@ class RetrySignalTests(unittest.TestCase):
 
     def test_no_video_routing_signal_does_not_match_unrelated_errors(self):
         self.assertTrue(NO_VIDEO_FOR_YTDLP.search("Unsupported URL"))
-        self.assertTrue(NO_VIDEO_FOR_YTDLP.search("There is no video in this post"))
+        self.assertTrue(NO_VIDEO_FOR_YTDLP.search("There's no video in this post"))
         self.assertTrue(NO_VIDEO_FOR_YTDLP.search("Requested format is not available"))
         self.assertFalse(NO_VIDEO_FOR_YTDLP.search("Permission denied"))
         self.assertFalse(NO_VIDEO_FOR_YTDLP.search("HTTP Error 503"))
