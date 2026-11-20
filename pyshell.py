@@ -59,7 +59,7 @@ def demo():
     assert "hello" in result.stdout, result.stdout
 
     child = popen([os.sys.executable, "-c",
-                   "import sys\\nfor i in range(3): print(i); sys.stdout.flush()"])
+                   "[print(i, flush=True) for i in range(3)]"])
     assert [line.strip() for line in child.stdout] == ["0", "1", "2"]
     assert child.wait() == 0
     print("pyshell: ok")
