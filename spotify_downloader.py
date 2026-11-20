@@ -45,6 +45,7 @@ APP_VERSION = "7.9.0"
 CREATOR = "Blue Knight"
 TELEGRAM_URL = "https://t.me/BlueKnight_Net"
 
+from blueknight.engines.wheels import select_compatible_wheel
 from blueknight.engines.catalog import (
     BGUTIL_DOWNLOAD_URLS, BGUTIL_PLUGIN_URL, DENO_ASSETS,
     DENO_DOWNLOAD_URLS, FFMPEG_DOWNLOADS, SPOTDL_ASSETS,
@@ -1361,7 +1362,6 @@ class SpotifyDownloader:
                     "User-Agent": f"{APP_NAME}/{APP_VERSION}",
                     "Accept": "application/json"}), timeout=30) as response:
                 payload = json.loads(response.read().decode("utf-8"))
-        cpython = f"cp{sys.version_info.major}{sys.version_info.minor}-"
         versions = []
         for raw_version, files in payload.get("releases", {}).items():
             if not re.fullmatch(r"\d+(?:\.\d+)*", raw_version):
@@ -1371,20 +1371,12 @@ class SpotifyDownloader:
                 continue
             versions.append((version_key, raw_version, files))
         for _, version, files in sorted(versions, reverse=True):
-            wheels = [item for item in files
-                      if item.get("packagetype") == "bdist_wheel"
-                      and item.get("filename", "").endswith(".whl")
-                      and not item.get("yanked", False)
-                      and ("py3-none-any" in item["filename"]
-                           or "py3-none-win_amd64" in item["filename"]
-                           or (cpython in item["filename"]
-                               and "win_amd64" in item["filename"]))]
-            if wheels:
-                wheels.sort(key=lambda item: "win_amd64" not in item["filename"])
-                wheel = wheels[0]
+            wheel = select_compatible_wheel(files)
+            if wheel:
                 return (version, wheel["url"], wheel["digests"]["sha256"],
                         wheel["filename"])
-        raise RuntimeError(f"PyPI has no supported Windows wheel for {spec['label']}.")
+        raise RuntimeError(
+            f"PyPI has no wheel compatible with this Python/platform for {spec['label']}.")
 
     def install_python_engine(self, name, version, url, digest, filename):
         """Download, verify and stage one wheel without activating it."""

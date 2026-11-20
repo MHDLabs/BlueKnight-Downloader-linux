@@ -6,3 +6,4 @@ streamlink>=8.4,<9
 img2pdf>=0.6,<1
 Pillow>=11,<13
 pikepdf>=10,<11
+packaging>=24
