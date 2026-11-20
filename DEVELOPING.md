@@ -300,8 +300,13 @@ certificate instead of receiving a new CI debug key on every build.
 ## Network module
 
 Proxy URL validation, credential-safe display formatting, process proxy
-environment setup, and the local SOCKS5-to-HTTP CONNECT bridge live in
-`blueknight/network/proxy.py`.
+environment setup, the local SOCKS5-to-HTTP CONNECT bridge, and the callback-driven
+`ProxyManager` live in `blueknight/network/proxy.py`. The desktop engine keeps
+thin compatibility methods so the current UI bridge is unchanged.
+
+The platform-aware engine manifest lives in `blueknight/engines/catalog.py`.
+It records existing versions, platform assets, release mirrors, FFmpeg archives
+and the optional PO-token provider. It does not remove any engines.
 
 The desktop engine imports these names through a compatibility layer, so older
 call sites and the current WebView API do not need to change during extraction.

@@ -66,7 +66,7 @@ The following are logical responsibilities, not completed modules yet:
 | --- | --- |
 | Application lifecycle and UI events | snapshot, begin, drain, ui, log, stop_download |
 | Network and proxy | blueknight/network/proxy.py now owns URL normalization, credential-safe display, process proxy environment and the SOCKS5 bridge; SpotifyDownloader still owns UI-facing proxy settings and connection tests |
-| Tool installation and updates | setup_dependencies, find_tool, get_or_download_tool, update_tools, component_summary |
+| Tool installation and updates | blueknight/engines/catalog.py owns version/platform manifests and release URLs; SpotifyDownloader still owns installation, validation and activation |
 | Authentication and cookies | probe_cookie, usable_cookies, sign_in, finish_sign_in, refresh_session, cookie_status |
 | Spotify | start_download, download_with_spotdl, Spotify metadata and matching helpers |
 | Media download orchestration | start_media_download, download_with_ytdlp, download_with_streamlink, gallery-dl fallback |
@@ -95,6 +95,17 @@ The UI-facing proxy controller has now been moved behind `ProxyManager` in
 application, owns connection checks and urllib opener lifetimes, and leaves
 `SpotifyDownloader` with thin compatibility methods. The application’s
 self-test still imports the legacy process-proxy helper through the same module.
+
+## Engine catalog extraction
+
+The platform-aware engine manifest now lives in `blueknight/engines/catalog.py`:
+versions, OS-specific assets, release mirrors, FFmpeg archives, the optional
+PO-token provider and the `TOOLS` registry. `spotify_downloader.py` imports
+these names as compatibility exports.
+
+This extraction does not remove or replace any engine. Downloading, validation,
+checksum checks and activation remain in the application service until their
+own module boundary is extracted.
 
 ## Intended module boundaries
 
