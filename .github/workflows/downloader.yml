@@ -1,7 +1,7 @@
 # Blue Knight Downloader — Linux-first desktop package. Windows CI is paused.
 #
-# PyInstaller cannot cross-compile: Windows and Linux packages are produced on
-# their native runners. That is why this workflow uses separate platform jobs.
+# PyInstaller packages are built on their native runners. Linux is the only
+# active CI target right now; the Windows packaging script remains available.
 #
 # The repository at the root holds a second, unrelated app (White Booster) with
 # its own release.yml on the "v*" tags. This one answers to "downloader-v*" so
