@@ -194,7 +194,7 @@ fi
 
 python3 -m PyInstaller "${PYI_ARGS[@]}" "$ROOT/spotify_downloader.py"
 
-cp "$ROOT/README.md" "$ROOT/THIRD_PARTY_NOTICES.txt" "$ROOT/GPL-3.0.txt" "$OUTPUT/"
+cp "$ROOT/README.md" "$ROOT/THIRD_PARTY_NOTICES.txt" "$ROOT/LICENSE" "$OUTPUT/"
 
 cd "$OUTPUT"
 if [ "$OS_TAG" = mac ]; then
@@ -202,12 +202,12 @@ if [ "$OS_TAG" = mac ]; then
     # the latter opens a terminal, and Gatekeeper treats it differently.
     PACKAGE="BlueKnightDownloader-macos-${ARCH}.zip"
     ditto -c -k --sequesterRsrc --keepParent BlueKnightDownloader.app "$PACKAGE"
-    zip -q "$PACKAGE" README.md THIRD_PARTY_NOTICES.txt GPL-3.0.txt
+    zip -q "$PACKAGE" README.md THIRD_PARTY_NOTICES.txt LICENSE
     echo "Application bundle created at $OUTPUT/BlueKnightDownloader.app"
 else
     PACKAGE="BlueKnightDownloader-linux-${ARCH}.tar.gz"
     : > portable.mode
-    tar -czf "$PACKAGE" BlueKnightDownloader portable.mode README.md THIRD_PARTY_NOTICES.txt GPL-3.0.txt
+    tar -czf "$PACKAGE" BlueKnightDownloader portable.mode README.md THIRD_PARTY_NOTICES.txt LICENSE
     echo "Standalone executable created at $OUTPUT/BlueKnightDownloader"
 fi
 echo "Release package created at $OUTPUT/$PACKAGE"

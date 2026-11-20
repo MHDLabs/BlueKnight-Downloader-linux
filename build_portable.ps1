@@ -173,7 +173,7 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCOD
 $Dist = $Output
 Copy-Item (Join-Path $Root "README.md") $Dist -Force
 Copy-Item (Join-Path $Root "THIRD_PARTY_NOTICES.txt") $Dist -Force
-Copy-Item (Join-Path $Root "GPL-3.0.txt") $Dist -Force
+Copy-Item (Join-Path $Root "LICENSE") $Dist -Force
 
 $Executable = Join-Path $Dist "BlueKnightDownloader.exe"
 $PortableMarker = Join-Path $Dist "portable.mode"
@@ -184,7 +184,7 @@ $PackageItems = @(
     $PortableMarker,
     (Join-Path $Dist "README.md"),
     (Join-Path $Dist "THIRD_PARTY_NOTICES.txt"),
-    (Join-Path $Dist "GPL-3.0.txt")
+    (Join-Path $Dist "LICENSE")
 )
 Compress-Archive -LiteralPath $PackageItems -DestinationPath $Package -CompressionLevel Optimal -Force
 
