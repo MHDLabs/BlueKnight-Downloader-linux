@@ -436,6 +436,10 @@ Third-party licenses, notices, and source links are available in:
 THIRD_PARTY_NOTICES.txt
 ```
 
+## License
+
+Blue Knight Downloader source code is licensed under the **GNU General Public License v3.0 only**. See [LICENSE](LICENSE). Third-party components retain their respective licenses; see [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
+
 Blue Knight Downloader is not affiliated with Spotify, YouTube, Google, TikTok, ByteDance, Instagram, or Meta.
 
 ---

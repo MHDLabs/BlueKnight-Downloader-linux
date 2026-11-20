@@ -1,9 +1,30 @@
-
-# Fetched at build time, like vendor/: a third-party bundle, not our source.
+# Downloaded at build time; not maintained as source code.
 engines/youtubejs/youtubei.bundle.mjs
 
+# Python caches and test output.
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 
-# The Android signer. Supplied by ANDROID_KEYSTORE_BASE64 in CI, never committed.
-keystore/
+# Local environments.
+.venv/
+venv/
+
+# Runtime data, downloads, cookies, and logs.
+/data/
+/downloads/
+/logs/
+/cookies.txt
+*.log
+
+# Build output.
+/build/
+/dist/
+
+# OS metadata.
+.DS_Store
+Thumbs.db

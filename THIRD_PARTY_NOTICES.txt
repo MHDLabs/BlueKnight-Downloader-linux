@@ -31,7 +31,7 @@ This package includes an FFmpeg GPL build from BtbN/FFmpeg-Builds.
 Build source and scripts: https://github.com/BtbN/FFmpeg-Builds
 FFmpeg source: https://ffmpeg.org/download.html
 Licensed under GNU GPL version 3 or later for this build. The complete GPLv3
-license text is included as GPL-3.0.txt.
+license text is included as LICENSE.
 
 Deno 2.9.5
 ----------

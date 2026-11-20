@@ -348,7 +348,7 @@ Rust modules have already been implemented.
 
 ## Licensing
 
-Released under **GPL-3.0** (`GPL-3.0.txt`). Bundled tools keep their own
+Released under **GPL-3.0-only** (`LICENSE`). Bundled tools keep their own
 licences — spotDL (MIT), yt-dlp (Unlicense), FFmpeg (GPL) — with sources and
 full notices in `THIRD_PARTY_NOTICES.txt`.
 
