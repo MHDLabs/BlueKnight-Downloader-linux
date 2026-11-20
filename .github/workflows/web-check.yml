@@ -7,6 +7,8 @@ on:
       - "web/**"
       - "tests/**"
       - "contracts/**"
+      - "spotify_downloader.py"
+      - "blueknight/**"
       - ".github/workflows/web-check.yml"
   pull_request:
     paths:
@@ -42,3 +44,6 @@ jobs:
 
       - name: Check Python and frontend bridge contract
         run: python tests/check_bridge_contract.py
+
+      - name: Test proxy URL handling and SOCKS5 bridge
+        run: python -m unittest discover -s tests -p "test_*.py" -v

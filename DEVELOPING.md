@@ -296,6 +296,24 @@ certificate instead of receiving a new CI debug key on every build.
 
 `blueknight_paths.py` runs its own checks with `python blueknight_paths.py`.
 
+
+## Network module
+
+Proxy URL validation, credential-safe display formatting, process proxy
+environment setup, and the local SOCKS5-to-HTTP CONNECT bridge live in
+`blueknight/network/proxy.py`.
+
+The desktop engine imports these names through a compatibility layer, so older
+call sites and the current WebView API do not need to change during extraction.
+Run the isolated proxy tests with:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+```
+
+The loopback integration test creates a local SOCKS5 server and echo target; it
+does not contact an external proxy or media website.
+
 ## Web interface
 
 The desktop WebView opens `web/index.html` from the local filesystem. Keep its
