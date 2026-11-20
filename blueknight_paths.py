@@ -300,7 +300,7 @@ def _migrate_portable_data(source_root, destination_root):
     if not _rebase_portable_engine_registry(source_root, destination_root):
         return
 
-    _write_text_atomically(marker, "portable-migration-v1\\n")
+    _write_text_atomically(marker, "portable-migration-v1\n")
 
 
 def app_data_dir(name="SpotifyDownloader"):

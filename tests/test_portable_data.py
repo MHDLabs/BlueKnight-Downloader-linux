@@ -158,7 +158,7 @@ class PortableDataMigrationTests(unittest.TestCase):
     def test_without_marker_keeps_using_per_user_data(self):
         legacy = self.legacy_root()
         legacy.mkdir(parents=True)
-        result = blueknight_paths.app_data_dir()
+        result = blueknight_paths.app_data_dir("TestDownloader")
         self.assertEqual(result, legacy)
         self.assertFalse(self.portable_root().exists())
 
