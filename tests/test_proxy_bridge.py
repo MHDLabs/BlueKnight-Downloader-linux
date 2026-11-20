@@ -3,7 +3,7 @@ import socketserver
 import threading
 import unittest
 
-from spotify_downloader import Socks5HttpBridge, normalize_proxy_url
+from blueknight.network.proxy import Socks5HttpBridge, normalize_proxy_url
 
 
 def recv_exact(sock, size):
