@@ -85,6 +85,86 @@ class DownloadStorageTests(unittest.TestCase):
 
         self.assertEqual(list(self.output.iterdir()), [])
 
+    def _configure_streamlink(self, chunks):
+        state = {"closed": False}
+
+        class Handle:
+            def __init__(self):
+                self.chunks = list(chunks)
+
+            def read(self, _size):
+                return self.chunks.pop(0) if self.chunks else b""
+
+            def close(self):
+                state["closed"] = True
+
+        class Stream:
+            def open(self):
+                return Handle()
+
+        class Session:
+            def set_option(self, *_args):
+                pass
+
+            def streams(self, _url):
+                return {"best": Stream()}
+
+        streamlink = types.ModuleType("streamlink")
+        streamlink.Streamlink = Session
+        self.app.use_proxy = types.SimpleNamespace(get=lambda: False)
+        self.app.proxy_url = types.SimpleNamespace(get=lambda: "")
+        self.app.proxy_type = types.SimpleNamespace(get=lambda: "http")
+        self.app.download_format = types.SimpleNamespace(get=lambda: "mp3")
+        self.app.ffmpeg_cmd = "/usr/bin/ffmpeg"
+        return streamlink, state
+
+    def test_streamlink_conversion_preserves_existing_output_and_uses_unique_name(self):
+        stamp = "20261120_204300"
+        stem = f"media_example_{stamp}"
+        existing = self.output / f"{stem}.mp4"
+        existing.write_bytes(b"previous-user-file")
+        streamlink, handle_state = self._configure_streamlink([b"recorded-stream", b""])
+
+        def convert(command, **_kwargs):
+            converted = Path(command[-1])
+            converted.write_bytes(b"converted-media")
+            return types.SimpleNamespace(returncode=0)
+
+        with mock.patch.dict(sys.modules, {"streamlink": streamlink}), \
+             mock.patch("spotify_downloader.time.strftime", return_value=stamp), \
+             mock.patch("spotify_downloader.subprocess.run", side_effect=convert):
+            result = self.app._download_with_streamlink(
+                "https://media.example/live", self.output, "best", False)
+
+        expected = self.output / f"{stem} (2).mp4"
+        self.assertEqual(result, expected)
+        self.assertEqual(existing.read_bytes(), b"previous-user-file")
+        self.assertEqual(result.read_bytes(), b"converted-media")
+        self.assertTrue(handle_state["closed"])
+        self.assertFalse((self.output / f"{stem}.ts").exists())
+        self.assertFalse(any(".part." in path.name for path in self.output.iterdir()))
+
+    def test_streamlink_failed_conversion_removes_partial_and_keeps_raw_recording(self):
+        stamp = "20261120_204301"
+        stem = f"media_example_{stamp}"
+        streamlink, handle_state = self._configure_streamlink([b"recorded-stream", b""])
+
+        def failed_convert(command, **_kwargs):
+            Path(command[-1]).write_bytes(b"truncated-conversion")
+            return types.SimpleNamespace(returncode=1)
+
+        with mock.patch.dict(sys.modules, {"streamlink": streamlink}), \
+             mock.patch("spotify_downloader.time.strftime", return_value=stamp), \
+             mock.patch("spotify_downloader.subprocess.run", side_effect=failed_convert):
+            result = self.app._download_with_streamlink(
+                "https://media.example/live", self.output, "best", False)
+
+        self.assertEqual(result, self.output / f"{stem}.ts")
+        self.assertEqual(result.read_bytes(), b"recorded-stream")
+        self.assertTrue(handle_state["closed"])
+        self.assertFalse(any(".part." in path.name for path in self.output.iterdir()))
+        self.assertFalse((self.output / f"{stem}.mp4").exists())
+
     def test_streamlink_read_failure_closes_handle_and_removes_partial(self):
         handle_state = {"closed": False}
 

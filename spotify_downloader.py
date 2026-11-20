@@ -1960,18 +1960,31 @@ class SpotifyDownloader:
             raise
 
         codec = self.download_format.get() if self.download_format.get() in {"mp3", "flac"} else "mp3"
-        target = raw.with_suffix(f".{codec}" if audio_only else ".mp4")
+        target_suffix = f".{codec}" if audio_only else ".mp4"
+        # The raw recording and converted output are different files. Reserve a
+        # unique destination for the latter too: a pre-existing MP4/MP3 must
+        # never be overwritten just because its matching TS file is absent.
+        target = unique_path(output, safe_filename(raw.stem, suffix=target_suffix))
+        # Keep the real media suffix last so FFmpeg can infer the muxer.
+        target_partial = unique_path(
+            output, f".{target.stem}.part{target.suffix}")
         command = ([self.ffmpeg_cmd, "-y", "-i", str(raw), "-vn", "-c:a",
-                    "libmp3lame" if codec == "mp3" else "flac", str(target)] if audio_only else
+                    "libmp3lame" if codec == "mp3" else "flac", str(target_partial)] if audio_only else
                    [self.ffmpeg_cmd, "-y", "-i", str(raw), "-c", "copy",
-                    "-movflags", "+faststart", str(target)])
-        result = subprocess.run(
-            command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        if result.returncode == 0 and target.is_file() and target.stat().st_size:
-            raw.unlink(missing_ok=True)
-            return target
-        return raw
+                    "-movflags", "+faststart", str(target_partial)])
+        try:
+            result = subprocess.run(
+                command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if (result.returncode == 0 and target_partial.is_file()
+                    and target_partial.stat().st_size):
+                os.replace(target_partial, target)
+                raw.unlink(missing_ok=True)
+                return target
+            return raw
+        finally:
+            with contextlib.suppress(OSError):
+                target_partial.unlink(missing_ok=True)
 
     # ------------------------------------------------------------------
     # Engines other than yt-dlp
