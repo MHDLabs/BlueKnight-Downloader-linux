@@ -7,6 +7,7 @@ import io
 import tempfile
 import unittest
 import zipfile
+from unittest import mock
 from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
@@ -59,6 +60,13 @@ class EngineManagerTests(unittest.TestCase):
             "app_version": "9.9.9",
             "spotdl_url_builder": lambda version: (f"https://spotdl.test/{version}",),
             "ytdlp_url_builder": lambda version: (f"https://ytdlp.test/{version}",),
+            "python_components": {
+                "demo-package": {"label": "Demo Package", "max_major": 3},
+            },
+            "engine_update_root": self.root / "python-engines",
+            "engine_update_registry": self.root / "python-engines" / "registry.json",
+            "wheel_selector": lambda files: next(
+                (item for item in files if item.get("compatible")), None),
         }
         options.update(overrides)
         tool_specs = options.pop("tool_specs", self.specs)
@@ -342,6 +350,123 @@ class EngineManagerTests(unittest.TestCase):
 
         self.assertEqual(target.read_bytes(), previous)
         self.assertFalse(target.with_name("demo.new").exists())
+
+
+    def test_latest_python_engine_selects_newest_allowed_compatible_wheel(self):
+        url = "https://pypi.org/pypi/demo-package/json"
+        compatible = {
+            "filename": "demo_package-2.4.0-py3-none-any.whl",
+            "url": "https://files.example/demo-2.4.whl",
+            "digests": {"sha256": "a" * 64},
+            "compatible": True,
+        }
+        payload = {
+            "releases": {
+                "2.3.0": [{"filename": "old.whl", "compatible": True}],
+                "2.4.0": [compatible],
+                "2.5.0": [{"filename": "unsupported.whl", "compatible": False}],
+                "3.0.0": [{"filename": "new-major.whl", "compatible": True}],
+                "not-a-version": [{"filename": "invalid.whl", "compatible": True}],
+            }
+        }
+        opener = FakeOpener({url: json.dumps(payload).encode()})
+        manager = self.manager(net_opener=lambda: nullcontext(opener))
+
+        result = manager.latest_python_engine("demo-package")
+
+        self.assertEqual(result, (
+            "2.4.0", compatible["url"], "a" * 64, compatible["filename"]))
+        request = opener.requests[0][2]
+        self.assertEqual(request.get_header("User-agent"), "Blue Knight Tests/9.9.9")
+        self.assertEqual(request.get_header("Accept"), "application/json")
+        self.assertEqual(opener.requests[0][1], 30)
+
+    def test_python_wheel_install_verifies_digest_and_stages_without_activation(self):
+        wheel_buffer = io.BytesIO()
+        with zipfile.ZipFile(wheel_buffer, "w") as archive:
+            archive.writestr("demo_package/__init__.py", "__version__ = '1.2.3'\n")
+        wheel_data = wheel_buffer.getvalue()
+        digest = hashlib.sha256(wheel_data).hexdigest()
+        filename = "demo_package-1.2.3-py3-none-any.whl"
+        url = "https://files.example/demo.whl"
+        opener = FakeOpener({url: wheel_data})
+        manager = self.manager(net_opener=lambda: nullcontext(opener))
+
+        record = manager.install_python_engine(
+            "demo-package", "1.2.3", url, digest, filename)
+
+        staged = Path(record["path"])
+        self.assertEqual(record["version"], "1.2.3")
+        self.assertEqual(record["sha256"], digest)
+        self.assertEqual(
+            (staged / "demo_package" / "__init__.py").read_text("utf-8"),
+            "__version__ = '1.2.3'\n")
+        self.assertTrue(staged.is_dir())
+        self.assertFalse((self.root / "python-engines" / (filename + ".part")).exists())
+        self.assertFalse((self.root / "python-engines" / "registry.json").exists())
+        self.assertEqual(opener.requests[0][1], 60)
+
+    def test_python_wheel_digest_mismatch_cleans_partial_download(self):
+        filename = "demo_package-1.2.3-py3-none-any.whl"
+        url = "https://files.example/demo.whl"
+        opener = FakeOpener({url: b"not a wheel"})
+        manager = self.manager(net_opener=lambda: nullcontext(opener))
+
+        with self.assertRaisesRegex(RuntimeError, "failed its PyPI SHA-256 check"):
+            manager.install_python_engine("demo-package", "1.2.3", url, "0" * 64, filename)
+
+        root = self.root / "python-engines"
+        self.assertFalse((root / (filename + ".part")).exists())
+        self.assertEqual(list(root.iterdir()), [])
+
+    def test_python_wheel_rejects_zip_path_traversal_and_cleans_partial_file(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("../escaped.txt", "not inside the package")
+            archive.writestr("demo_package/__init__.py", "__version__ = '1.2.3'\n")
+        wheel_data = buffer.getvalue()
+        digest = hashlib.sha256(wheel_data).hexdigest()
+        filename = "demo_package-1.2.3-py3-none-any.whl"
+        url = "https://files.example/demo.whl"
+        opener = FakeOpener({url: wheel_data})
+        manager = self.manager(net_opener=lambda: nullcontext(opener))
+
+        with self.assertRaises(ValueError):
+            manager.install_python_engine("demo-package", "1.2.3", url, digest, filename)
+
+        self.assertFalse((self.root / "escaped.txt").exists())
+        self.assertFalse((self.root / "python-engines" / (filename + ".part")).exists())
+        self.assertEqual(
+            [entry.name for entry in (self.root / "python-engines").iterdir()], [])
+
+    def test_python_engine_registry_merges_records_and_replaces_atomically(self):
+        registry = self.root / "python-engines" / "registry.json"
+        registry.parent.mkdir(parents=True)
+        registry.write_text(json.dumps({"already-installed": {"version": "1.0"}}), "utf-8")
+        manager = self.manager()
+        records = {"demo-package": {"version": "2.0", "path": "/staged/demo", "sha256": "a" * 64}}
+
+        manager.commit_python_engine_updates(records)
+
+        saved = json.loads(registry.read_text("utf-8"))
+        self.assertEqual(saved["already-installed"], {"version": "1.0"})
+        self.assertEqual(saved["demo-package"], records["demo-package"])
+        self.assertFalse(registry.with_suffix(".json.new").exists())
+
+    def test_python_engine_registry_failure_preserves_previous_file_and_cleans_pending(self):
+        registry = self.root / "python-engines" / "registry.json"
+        registry.parent.mkdir(parents=True)
+        previous = json.dumps({"stable": {"version": "1.0"}})
+        registry.write_text(previous, "utf-8")
+        manager = self.manager()
+
+        with mock.patch("blueknight.engines.manager.os.replace", side_effect=OSError("disk error")):
+            with self.assertRaisesRegex(OSError, "disk error"):
+                manager.commit_python_engine_updates({"next": {"version": "2.0"}})
+
+        self.assertEqual(registry.read_text("utf-8"), previous)
+        self.assertFalse(registry.with_suffix(".json.new").exists())
+
 
 
 if __name__ == "__main__":

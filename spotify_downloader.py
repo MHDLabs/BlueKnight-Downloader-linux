@@ -948,7 +948,11 @@ class SpotifyDownloader:
             ui_callback=self.ui, log_callback=self.log,
             make_executable=make_executable,
             app_name=APP_NAME, app_version=APP_VERSION,
-            spotdl_url_builder=spotdl_urls, ytdlp_url_builder=ytdlp_urls)
+            spotdl_url_builder=spotdl_urls, ytdlp_url_builder=ytdlp_urls,
+            python_components=PYTHON_COMPONENTS,
+            engine_update_root=ENGINE_UPDATE_ROOT,
+            engine_update_registry=ENGINE_UPDATE_REGISTRY,
+            wheel_selector=select_compatible_wheel)
         self.spotdl_exe = self.tools_dir / f"spotdl{EXE}"
 
         # Proxy settings with proper defaults for v2rayN
@@ -1330,61 +1334,13 @@ class SpotifyDownloader:
             return None
 
     def latest_python_engine(self, name):
-        """Latest supported wheel metadata from PyPI's HTTPS index."""
-        spec = PYTHON_COMPONENTS[name]
-        url = f"https://pypi.org/pypi/{name}/json"
-        with self._net_opener() as opener:
-            with opener.open(urllib.request.Request(url, headers={
-                    "User-Agent": f"{APP_NAME}/{APP_VERSION}",
-                    "Accept": "application/json"}), timeout=30) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        versions = []
-        for raw_version, files in payload.get("releases", {}).items():
-            if not re.fullmatch(r"\d+(?:\.\d+)*", raw_version):
-                continue
-            version_key = tuple(int(part) for part in raw_version.split("."))
-            if version_key[0] >= spec["max_major"]:
-                continue
-            versions.append((version_key, raw_version, files))
-        for _, version, files in sorted(versions, reverse=True):
-            wheel = select_compatible_wheel(files)
-            if wheel:
-                return (version, wheel["url"], wheel["digests"]["sha256"],
-                        wheel["filename"])
-        raise RuntimeError(
-            f"PyPI has no wheel compatible with this Python/platform for {spec['label']}.")
+        """Compatibility adapter for PyPI wheel discovery in EngineManager."""
+        return self.engine_manager.latest_python_engine(name)
 
     def install_python_engine(self, name, version, url, digest, filename):
-        """Download, verify and stage one wheel without activating it."""
-        ENGINE_UPDATE_ROOT.mkdir(parents=True, exist_ok=True)
-        wheel_path = ENGINE_UPDATE_ROOT / (filename + ".part")
-        wheel_path.unlink(missing_ok=True)
-        try:
-            with self._net_opener() as opener:
-                request = urllib.request.Request(
-                    url, headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"})
-                with opener.open(request, timeout=60) as response, wheel_path.open("wb") as target:
-                    shutil.copyfileobj(response, target, length=1024 * 1024)
-            actual = hashlib.sha256(wheel_path.read_bytes()).hexdigest()
-            if actual.lower() != digest.lower():
-                raise RuntimeError("downloaded wheel failed its PyPI SHA-256 check")
-
-            safe_version = re.sub(r"[^0-9A-Za-z_.-]", "_", version)
-            target_dir = ENGINE_UPDATE_ROOT / f"{name}-{safe_version}-{digest[:12].lower()}"
-            if not target_dir.is_dir():
-                with tempfile.TemporaryDirectory(dir=ENGINE_UPDATE_ROOT) as temp:
-                    staging = Path(temp) / "package"
-                    staging.mkdir()
-                    root = staging.resolve()
-                    with zipfile.ZipFile(wheel_path) as wheel:
-                        for member in wheel.infolist():
-                            destination = (staging / member.filename).resolve()
-                            destination.relative_to(root)
-                        wheel.extractall(staging)
-                    os.replace(staging, target_dir)
-            return {"version": version, "path": str(target_dir), "sha256": digest.lower()}
-        finally:
-            wheel_path.unlink(missing_ok=True)
+        """Compatibility adapter for verified Python wheel staging."""
+        return self.engine_manager.install_python_engine(
+            name, version, url, digest, filename)
 
     def validate_python_engine_updates(self, records):
         """Smoke-test staged wheels together in a clean child process."""
@@ -1402,19 +1358,9 @@ class SpotifyDownloader:
             detail = (result.stderr or result.stdout or "compatibility probe failed").strip()
             raise RuntimeError(detail[-180:])
 
-    @staticmethod
-    def commit_python_engine_updates(records):
-        """Atomically activate a validated group on the next app launch."""
-        try:
-            registry = json.loads(ENGINE_UPDATE_REGISTRY.read_text("utf-8"))
-            if not isinstance(registry, dict):
-                registry = {}
-        except (OSError, ValueError):
-            registry = {}
-        registry.update(records)
-        pending = ENGINE_UPDATE_REGISTRY.with_suffix(".json.new")
-        pending.write_text(json.dumps(registry, indent=2), encoding="utf-8")
-        os.replace(pending, ENGINE_UPDATE_REGISTRY)
+    def commit_python_engine_updates(self, records):
+        """Compatibility adapter for next-launch Python engine registration."""
+        return self.engine_manager.commit_python_engine_updates(records)
 
     def _is_native_executable(self, path, minimum_size=1024 * 1024):
         """Compatibility adapter for executable validation in EngineManager."""

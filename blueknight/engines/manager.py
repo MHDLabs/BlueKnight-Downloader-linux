@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -25,7 +26,9 @@ class EngineManager:
             system_which=None, minimum_executable_size=1024 * 1024,
             net_opener=None, ui_callback=None, log_callback=None,
             make_executable=None, app_name="Blue Knight Downloader",
-            app_version="0", spotdl_url_builder=None, ytdlp_url_builder=None):
+            app_version="0", spotdl_url_builder=None, ytdlp_url_builder=None,
+            python_components=None, engine_update_root=None,
+            engine_update_registry=None, wheel_selector=None):
         self.tools_dir = Path(tools_dir)
         self.tool_specs = tool_specs
         self.bundled_tool = bundled_tool
@@ -43,6 +46,12 @@ class EngineManager:
         self.app_version = app_version
         self.spotdl_url_builder = spotdl_url_builder
         self.ytdlp_url_builder = ytdlp_url_builder
+        self.python_components = python_components or {}
+        self.engine_update_root = (Path(engine_update_root)
+                                   if engine_update_root is not None else None)
+        self.engine_update_registry = (Path(engine_update_registry)
+                                       if engine_update_registry is not None else None)
+        self.wheel_selector = wheel_selector
 
     def is_native_executable(self, path, minimum_size=None):
         """Validate a local executable signature and minimum file size."""
@@ -142,6 +151,96 @@ class EngineManager:
             return tag.strip().lstrip("vV") or None
         except Exception:
             return None
+
+    def latest_python_engine(self, name):
+        """Return the newest allowed PyPI wheel compatible with this runtime."""
+        if self.net_opener is None:
+            raise RuntimeError("The Python engine updater has no network opener.")
+        spec = self.python_components[name]
+        url = f"https://pypi.org/pypi/{name}/json"
+        with self.net_opener() as opener:
+            request = urllib.request.Request(url, headers={
+                "User-Agent": f"{self.app_name}/{self.app_version}",
+                "Accept": "application/json",
+            })
+            with opener.open(request, timeout=30) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        selector = self.wheel_selector
+        if selector is None:
+            from blueknight.engines.wheels import select_compatible_wheel
+            selector = select_compatible_wheel
+
+        versions = []
+        for raw_version, files in payload.get("releases", {}).items():
+            if not re.fullmatch(r"\d+(?:\.\d+)*", raw_version):
+                continue
+            version_key = tuple(int(part) for part in raw_version.split("."))
+            if version_key[0] >= spec["max_major"]:
+                continue
+            versions.append((version_key, raw_version, files))
+        for _, version, files in sorted(versions, reverse=True):
+            wheel = selector(files)
+            if wheel:
+                return (version, wheel["url"], wheel["digests"]["sha256"],
+                        wheel["filename"])
+        raise RuntimeError(
+            f"PyPI has no wheel compatible with this Python/platform for {spec['label']}.")
+
+    def install_python_engine(self, name, version, url, digest, filename):
+        """Download, verify and safely stage one wheel without activating it."""
+        if self.engine_update_root is None or self.net_opener is None:
+            raise RuntimeError("The Python engine staging service is not configured.")
+        update_root = self.engine_update_root
+        update_root.mkdir(parents=True, exist_ok=True)
+        wheel_path = update_root / (filename + ".part")
+        wheel_path.unlink(missing_ok=True)
+        try:
+            with self.net_opener() as opener:
+                request = urllib.request.Request(
+                    url, headers={"User-Agent": f"{self.app_name}/{self.app_version}"})
+                with opener.open(request, timeout=60) as response, wheel_path.open("wb") as target:
+                    shutil.copyfileobj(response, target, length=1024 * 1024)
+            actual = hashlib.sha256(wheel_path.read_bytes()).hexdigest()
+            if actual.lower() != digest.lower():
+                raise RuntimeError("downloaded wheel failed its PyPI SHA-256 check")
+
+            safe_version = re.sub(r"[^0-9A-Za-z_.-]", "_", version)
+            target_dir = update_root / f"{name}-{safe_version}-{digest[:12].lower()}"
+            if not target_dir.is_dir():
+                with tempfile.TemporaryDirectory(dir=update_root) as temp:
+                    staging = Path(temp) / "package"
+                    staging.mkdir()
+                    root = staging.resolve()
+                    with zipfile.ZipFile(wheel_path) as wheel:
+                        for member in wheel.infolist():
+                            destination = (staging / member.filename).resolve()
+                            destination.relative_to(root)
+                        wheel.extractall(staging)
+                    os.replace(staging, target_dir)
+            return {"version": version, "path": str(target_dir), "sha256": digest.lower()}
+        finally:
+            wheel_path.unlink(missing_ok=True)
+
+    def commit_python_engine_updates(self, records):
+        """Atomically register a validated group for activation on next launch."""
+        if self.engine_update_registry is None:
+            raise RuntimeError("The Python engine registry is not configured.")
+        registry_path = self.engine_update_registry
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            registry = json.loads(registry_path.read_text("utf-8"))
+            if not isinstance(registry, dict):
+                registry = {}
+        except (OSError, ValueError):
+            registry = {}
+        registry.update(records)
+        pending = registry_path.with_suffix(registry_path.suffix + ".new")
+        try:
+            pending.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+            os.replace(pending, registry_path)
+        finally:
+            pending.unlink(missing_ok=True)
+
 
     def download_with_fallbacks(self, urls, destination, label):
         """Download atomically, trying independent hosts in order."""
