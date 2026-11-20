@@ -1,0 +1,39 @@
+name: Web frontend checks
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "web/**"
+      - "tests/**"
+      - ".github/workflows/web-check.yml"
+  pull_request:
+    paths:
+      - "web/**"
+      - "tests/**"
+      - ".github/workflows/web-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Validate frontend assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check HTML asset references
+        run: python tests/check_web_assets.py
+
+      - name: Check JavaScript syntax and shared bindings
+        run: node tests/check_web_scripts.mjs
