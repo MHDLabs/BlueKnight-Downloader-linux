@@ -111,22 +111,25 @@ These are focused boundaries, not a complete engine manager. Downloading,
 native executable validation, version probing, checksum checks, installation
 and activation still remain in the application service. No engine was removed.
 
-## Engine discovery and version probing
+## Engine discovery and verified tool installation
 
-The first manager slice is implemented in \`blueknight/engines/manager.py\`.
-\`EngineManager\` now owns:
+The engine manager in `blueknight/engines/manager.py` owns:
 
 - platform-specific executable signature and size validation;
 - the legacy lookup order: app-managed tools, bundled tools, system PATH,
   then an installed Python module;
 - version command selection and output parsing for Deno, FFmpeg/ffprobe and
   other command-line tools;
-- version-specific spotDL and yt-dlp mirror URL selection.
+- release metadata lookup and version-specific spotDL/yt-dlp mirror selection;
+- proxy-aware mirror downloads with the existing progress/log callbacks;
+- archive member extraction, SHA-256 verification, executable/version checks
+  and atomic activation.
 
-\`SpotifyDownloader\` constructs the manager and keeps its previous methods as
-compatibility adapters. The download/retry flow, checksums, archive extraction,
-staging and activation have not moved yet. Focused unit tests exercise the
-platform signatures, lookup precedence and version parser.
+`SpotifyDownloader` constructs the manager and keeps its previous methods as
+compatibility adapters. The manager receives the existing network opener,
+which preserves proxy routing, and the existing UI/log callbacks. Python-wheel
+staging and the FFmpeg-specific installer remain separate for now. Focused
+tests use fake responses and temporary files; they do not contact real mirrors.
 
 
 ## Intended module boundaries

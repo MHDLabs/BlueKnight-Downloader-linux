@@ -66,17 +66,18 @@ The platform-specific Python wheel selector lives in
 interpreter and platform, with deterministic coverage for Linux, Windows and
 universal wheels.
 
-The first engine-manager slice is now implemented in
-`blueknight/engines/manager.py`. `EngineManager` owns native executable
-validation, the existing tool discovery order, version probing and versioned
-release URL selection. `SpotifyDownloader` retains compatibility adapters, so
-current UI and update call sites remain unchanged.
+The engine manager in `blueknight/engines/manager.py` now owns native
+executable validation, tool discovery, version probing, release metadata,
+mirror downloads, archive member extraction, SHA-256 validation, version checks
+and atomic activation. The desktop methods remain compatibility adapters and
+inject the existing proxy-aware opener plus UI/log callbacks.
 
-Next, move network downloads, checksum verification, staged installation,
-update validation and activation behind the manager. Keep the existing UI-facing
-methods as thin adapters until callers migrate. Do not change the set of
-engines or their update sources without a separate, tested reason.
-
+Python wheel discovery, SHA-256 validation and staging remain in their existing
+dedicated path. The remaining work in this phase is to move the Python-engine
+staging/registry lifecycle and the FFmpeg-specific installer behind focused
+service interfaces, then verify update/rollback behaviour end to end. Do not
+change the set of engines or their update sources without a separate, tested
+reason.
 **Exit criteria:** the manager has focused unit tests and the GUI still reports,
 installs, updates and launches the same tools as before.
 
