@@ -31,17 +31,13 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 from blueknight_paths import (
-    ARCH, COOKIE_FAILURE, EXE, IS_ANDROID, IS_LINUX, IS_MACOS, IS_WINDOWS, OS_TAG,
+    ARCH, COOKIE_FAILURE, EXE, IS_LINUX, IS_MACOS, IS_WINDOWS, OS_TAG,
     SITE_SESSION_COOKIES, SOURCES, app_data_dir, candidate_label, cookie_candidates,
     cookie_dir, download_dir, download_root, host_matches, jar_line_matches_domain,
     locked_by_browser, read_registry, record_jar, registry_entry, ytdlp_cookie_args)
 import pyshell
 
-# The window toolkit. Android supplies its own WebView and never imports this.
-if not IS_ANDROID:
-    import webview
-else:
-    webview = None
+import webview
 
 
 APP_NAME = "Blue Knight Downloader"
@@ -258,45 +254,16 @@ def normalize_media_url(kind, value):
     return value
 
 
-# What to try when yt-dlp comes back empty-handed, in order. yt-dlp is always
-# first and is not listed here. "gallery-dl" resolves photos and mixed posts;
-# "direct" treats the link as the file itself, which needs no engine at all.
+# What to try when yt-dlp comes back empty-handed. yt-dlp is always first.
 ENGINES = {
     "x": ("gallery-dl", "html5", "direct"),
     "instagram": ("gallery-dl",),
-    "general": (("newpipe",) if IS_ANDROID else ())
-               + ("streamlink", "html5", "gallery-dl", "direct"),
+    "general": ("youtube-explode", "newpipe", "streamlink", "html5",
+                "gallery-dl", "direct"),
+    "youtube": ("youtube-explode", "newpipe", "youtube-js"),
+    "ytmusic": ("youtube-explode", "newpipe", "youtube-js"),
+    "soundcloud": ("newpipe",),
 }
-# What runs after yt-dlp, in order. yt-dlp itself is not listed: it is not a
-# fallback, it is the engine, and these exist for the runs it cannot finish.
-#
-#   Desktop:  yt-dlp -> YoutubeExplode -> NewPipe
-#   Android:  yt-dlp -> NewPipe
-#
-# YoutubeExplode is a .NET library and ships as a sidecar the desktop packages
-# carry; there is no Android build of it and none is wanted, because the phone
-# reaches the same clients through NewPipe already.
-if IS_ANDROID:
-    # NewPipeExtractor is an Android/JVM library, exposed to this shared engine
-    # by android_bridge. It is deliberately second to yt-dlp, whose extractor
-    # catalogue and playlist support are much broader.
-    ENGINES.update({
-        "youtube": ("newpipe", "youtube-js"),
-        "ytmusic": ("newpipe", "youtube-js"),
-        "soundcloud": ("newpipe",),
-    })
-    ENGINES["general"] = ENGINES["general"]
-else:
-    ENGINES.update({
-        "youtube": ("youtube-explode", "newpipe", "youtube-js"),
-        "ytmusic": ("youtube-explode", "newpipe", "youtube-js"),
-        # NewPipe is not a YouTube library. It covers SoundCloud, Bandcamp,
-        # PeerTube, media.ccc.de and more, so the sources it knows get a second
-        # engine too rather than only YouTube having one.
-        "soundcloud": ("newpipe",),
-    })
-    ENGINES["general"] = ("youtube-explode", "newpipe") + ENGINES["general"]
-
 
 def cookie_domain_for(kind, url):
     """The only cookie domain an attempt may borrow for this URL."""
@@ -317,24 +284,6 @@ PYTHON_COMPONENTS = {
     "pillow": {"label": "Pillow", "module": "PIL", "max_major": 13},
     "certifi": {"label": "certifi CA bundle", "module": "certifi", "max_major": 3000},
 }
-# pikepdf wraps qpdf, a C++ library with no Android build. pypdf does the same
-# reading and rewriting in pure Python, so it stands in there; the desktops keep
-# pikepdf, which is faster and stricter on damaged files.
-# Installed by the Android shell at boot: given a source, re-reads its live
-# session from the system CookieManager and rewrites the jar, returning
-# (cookies written, whether a session cookie was among them). Left None on the
-# desktops, which re-read a real browser profile instead.
-SESSION_REFRESHER = None
-# Installed by android_bridge at boot. It returns NewPipeExtractor's direct
-# stream candidates as a plain dict and stays None on every desktop build.
-NEWPIPE_RESOLVER = None
-# Installed by the Android shell, which runs the YouTube.js engine in a WebView
-# instead of under Deno. Desktop leaves this None and spawns Deno itself.
-YOUTUBEJS_RESOLVER = None
-# Installed by the Android shell, which mints tokens in a WebView. Desktop
-# leaves this None and runs the same script under Deno.
-POTOKEN_MINTER = None
-
 
 def youtube_video_id(url):
     """The eleven characters YouTube identifies a video by, or None."""
@@ -342,18 +291,10 @@ def youtube_video_id(url):
                       str(url or ""))
     return match.group(1) if match else None
 
-PDF_LIBRARY = "pypdf" if IS_ANDROID else "pikepdf"
+PDF_LIBRARY = "pikepdf"
 PYTHON_COMPONENTS[PDF_LIBRARY] = {
-    "label": PDF_LIBRARY, "module": PDF_LIBRARY,
-    "max_major": 7 if IS_ANDROID else 11,
+    "label": PDF_LIBRARY, "module": PDF_LIBRARY, "max_major": 11,
 }
-if IS_ANDROID:
-    # img2pdf requires pikepdf, whose qpdf extension has no Android wheel.
-    # Android renders image PDFs with reportlab instead.
-    PYTHON_COMPONENTS.pop("img2pdf", None)
-    PYTHON_COMPONENTS["reportlab"] = {
-        "label": "reportlab", "module": "reportlab", "max_major": 6,
-    }
 ENGINE_UPDATE_ROOT = (app_data_dir() / "python-engines")
 ENGINE_UPDATE_REGISTRY = ENGINE_UPDATE_ROOT / "registry.json"
 
@@ -445,18 +386,7 @@ OFFICE_DOCUMENT_EXTENSIONS = {
     ".odt", ".ods", ".odp", ".rtf", ".txt", ".csv", ".html", ".htm",
 }
 EBOOK_CONVERT_EXTENSIONS = {".epub", ".mobi", ".azw", ".azw3", ".fb2"}
-# One identity for the whole app: the browser the sign-in window presents, and
-# the browser the harvested session is replayed by. A session cookie used from
-# a different kind of device than the one that earned it is one of the clearest
-# automation signals there is, and answering "not a bot" is what it costs.
-#
-# On Android the shell hands over the WebView's own agent, because that WebView
-# is what the login page actually talks to. The fallbacks below are only for
-# when it cannot be read — and the Android one still says Android.
 BROWSER_UA = os.environ.get("BLUEKNIGHT_UA", "").strip() or (
-    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-    if IS_ANDROID else
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 # Frozen Python builds do not consistently find a usable OpenSSL CA bundle.
@@ -851,45 +781,10 @@ class Var:
         self._value = value
 
 
-def android_shim(target, name):
-    """Give a packaged Android executable back its real name.
-
-    Two rules collide on Android. The system only unpacks a bundled binary, and
-    only marks it executable, when it sits in the native library directory
-    under a lib*.so name. yt-dlp, meanwhile, identifies a program by its file
-    name — it will never accept "libffmpeg.so" as ffmpeg, so merging a video
-    with its audio track and writing an MP3 would both fail with the tool
-    apparently missing.
-
-    A symlink satisfies both: the link carries the name the tool is looked up
-    by, and the target stays the file the kernel is willing to execute. The
-    link cannot be a copy, because app storage is mounted no-exec from API 29.
-    """
-    link = app_data_dir() / "bin" / name
-    try:
-        if link.is_symlink() and link.resolve() == Path(target).resolve():
-            return link
-        link.parent.mkdir(parents=True, exist_ok=True)
-        link.unlink(missing_ok=True)
-        link.symlink_to(target)
-        return link
-    except OSError:
-        # No symlink support: the raw path still runs, it just cannot be found
-        # by name — which the caller reports rather than failing silently.
-        return Path(target)
-
-
 def bundled_tool(name):
     """Find a packaged tool in both PyInstaller one-file and one-folder layouts."""
-    # Android unpacks a bundled executable only from the native library
-    # directory, and only when it is named like a library. The shell passes
-    # that directory in; the lib*.so name is a packaging rule, not a format.
     tools_override = os.environ.get("BLUEKNIGHT_TOOLS")
     if tools_override:
-        stem = Path(name).stem
-        packaged = Path(tools_override) / f"lib{stem}.so"
-        if packaged.is_file():
-            return str(android_shim(packaged, stem))
         direct = Path(tools_override) / name
         if direct.is_file():
             return str(direct)
@@ -1184,9 +1079,6 @@ class SpotifyDownloader:
         """
         if not self.is_downloading:
             return False                      # stop means stop, for everything
-        if kind is not None and not (NEWPIPE_RESOLVER is not None
-                                     and "newpipe" in ENGINES.get(kind, ())):
-            return False
         return not TERMINAL_FAILURE.search(str(detail or ""))
 
     def log_engine_attempt(self, engine, stage, url, quality, detail="", started=None):
@@ -1359,28 +1251,21 @@ class SpotifyDownloader:
             if not self.ffmpeg_cmd:
                 raise RuntimeError("Failed to setup FFmpeg")
 
-            if IS_ANDROID:
-                # spotDL depends on native Python extensions which have no
-                # Android wheels. The Android path below resolves Spotify
-                # metadata and downloads the matching YouTube Music audio.
-                self.spotdl_cmd = "Android Spotify engine"
-            else:
-                self.ui("setup", "Checking spotDL...", "This downloads Spotify tracks")
-                self.spotdl_cmd = self.get_or_download_tool("spotdl")
-                if not self.spotdl_cmd:
-                    raise RuntimeError("spotDL was installed, but its command could not be located.")
+            self.ui("setup", "Checking spotDL...", "This downloads Spotify tracks")
+            self.spotdl_cmd = self.get_or_download_tool("spotdl")
+            if not self.spotdl_cmd:
+                raise RuntimeError("spotDL was installed, but its command could not be located.")
 
             self.ui("setup", "Checking yt-dlp...", "This downloads YouTube, TikTok, Instagram and video-site media")
             self.ytdlp_cmd = self.get_or_download_tool("yt-dlp")
             if not self.ytdlp_cmd:
                 raise RuntimeError("yt-dlp was installed, but its command could not be located.")
 
-            if not IS_ANDROID:
-                self.ui("setup", "Checking YouTube challenge runtime...",
-                        "Deno runs yt-dlp's bundled EJS challenge solver")
-                self.deno_cmd = self.get_or_download_tool("deno")
-                if not self.deno_cmd:
-                    raise RuntimeError("Deno was installed, but its command could not be located.")
+            self.ui("setup", "Checking YouTube challenge runtime...",
+                    "Deno runs yt-dlp's bundled EJS challenge solver")
+            self.deno_cmd = self.get_or_download_tool("deno")
+            if not self.deno_cmd:
+                raise RuntimeError("Deno was installed, but its command could not be located.")
 
             self.ui("setup", "Checking fallback engines...",
                     "This adds live streams, HTML galleries and mixed media")
@@ -1397,13 +1282,7 @@ class SpotifyDownloader:
             self.log("✓ FFmpeg: " + str(self.ffmpeg_cmd), "success")
             self.log("✓ spotDL: " + str(self.spotdl_cmd), "success")
             self.log("✓ yt-dlp: " + str(self.ytdlp_cmd), "success")
-            # Whatever engine YouTube's challenge will actually be solved with,
-            # named. This used to report Deno and nothing else, so on Android —
-            # where Deno never exists and QuickJS does — the line simply
-            # vanished, and a runtime that was missing or unusable looked
-            # exactly like one that was fine. Without one, yt-dlp drops every
-            # format whose URL has to be decrypted, and the download fails
-            # complaining about formats rather than about the engine.
+            # Report the runtime yt-dlp will actually use for JavaScript challenges.
             runtime_name, runtime_path = self.js_runtime()
             if runtime_name:
                 self.log(f"✓ JS runtime: {runtime_name} ({runtime_path})", "success")
@@ -1609,13 +1488,8 @@ class SpotifyDownloader:
         found = shutil.which(name)
         if found:
             return found
-        # Nothing on disk. An importable package is still a usable tool, and
-        # pyshell knows how to run one; this is the whole Android path.
-        if spec.get("module"):
-            if IS_ANDROID and pyshell.module_available(name):
-                return name
-            if not IS_ANDROID and pyshell.module_version(name) != "unknown":
-                return name
+        if spec.get("module") and pyshell.module_version(name) != "unknown":
+            return name
         return None
 
     @staticmethod
@@ -1630,16 +1504,6 @@ class SpotifyDownloader:
     def get_or_download_tool(self, name, force=False, version=None):
         """Return a usable tool path, downloading from the mirrors when needed."""
         spec = TOOLS[name]
-        if IS_ANDROID and spec.get("module"):
-            # Python command packages are compiled into the APK by Chaquopy.
-            # Android has no compatible native release asset to fetch, so never
-            # turn a missing/broken bundle into a doomed network download.
-            existing = self.find_tool(name)
-            if existing:
-                return existing
-            raise RuntimeError(
-                f"The bundled {spec['label']} package is missing or cannot start. "
-                "Install a complete BlueKnight Downloader APK.")
         if not force:
             existing = self.find_tool(name)
             if existing:
@@ -1717,10 +1581,6 @@ class SpotifyDownloader:
 
     def update_tools(self):
         """Refresh spotDL and yt-dlp from their mirrors, then report per tool."""
-        if IS_ANDROID:
-            self.notify(
-                "Android components are verified and updated with each app release.", "ok")
-            return
         if self.updating or self.is_downloading or self.is_converting or self.setup_running:
             self.notify("Wait for the current job to finish.", "err")
             return
@@ -1969,15 +1829,13 @@ class SpotifyDownloader:
         pdf_label = PYTHON_COMPONENTS[PDF_LIBRARY]["label"]
         desktop_converters = (
             f"\nOffice converter: {self._converter_program('soffice') or 'LibreOffice not found'}"
-            f"\nEbook converter: {self._converter_program('ebook-convert') or 'Calibre not found'}"
-            if not IS_ANDROID else "")
+            f"\nEbook converter: {self._converter_program('ebook-convert') or 'Calibre not found'}")
         return (f"Spotify engine: {self.spotdl_cmd}\n"
                 f"yt-dlp: {self.ytdlp_cmd}\n"
-                f"Deno/EJS: {self.deno_cmd or 'not used on Android'}\n"
+                f"Deno/EJS: {self.deno_cmd}\n"
                 f"gallery-dl: {python_versions['gallery-dl']}\n"
                 f"Streamlink: {python_versions['streamlink']}\n"
-                f"{'reportlab' if IS_ANDROID else 'img2pdf'}: "
-                f"{python_versions['reportlab' if IS_ANDROID else 'img2pdf']}\n"
+                f"img2pdf: {python_versions['img2pdf']}\n"
                 f"Pillow: {python_versions['pillow']}\n"
                 f"{pdf_label}: {python_versions[PDF_LIBRARY]}\n"
                 f"certifi: {python_versions['certifi']}\n"
@@ -2059,7 +1917,7 @@ class SpotifyDownloader:
         end with nothing.
         """
         self._bgutil_pythonpath = None
-        if IS_ANDROID or not BGUTIL_DOWNLOAD_URLS:
+        if not BGUTIL_DOWNLOAD_URLS:
             return []
         try:
             binary = self.get_or_download_tool("bgutil")
@@ -2126,19 +1984,10 @@ class SpotifyDownloader:
         stream, and every MP3 extraction, would have failed with the tool
         reported missing.
 
-        When the shims cannot be made, the binary's own path goes instead.
-        yt-dlp accepts a file there and picks the program out of its name, and
-        "libffmpeg.so" contains "ffmpeg".
+        Return the folder when ffmpeg and ffprobe share one; otherwise return
+        the explicit ffmpeg path.
         """
         ffmpeg = Path(self.ffmpeg_cmd)
-        if IS_ANDROID:
-            # Resolving ffprobe is what puts its shim beside ffmpeg's, and it
-            # has to happen here rather than at start-up: a folder holding one
-            # of the pair is a folder yt-dlp cannot probe formats with, and
-            # nothing else guarantees the order. android_shim is idempotent, so
-            # asking again costs a stat.
-            with contextlib.suppress(Exception):
-                bundled_tool(f"ffprobe{EXE}")
         folder = ffmpeg.parent
         if (folder / f"ffmpeg{EXE}").is_file():
             return str(folder)
@@ -2210,172 +2059,10 @@ class SpotifyDownloader:
             "proxy_type": self.proxy_type.get(),
         }
         threading.Thread(
-            target=(self.download_with_android_spotify
-                    if IS_ANDROID else self.download_with_spotdl),
+            target=self.download_with_spotdl,
             args=(url, output, options),
             daemon=True,
         ).start()
-
-    def _spotify_json(self, url, token=None):
-        headers = {"User-Agent": BROWSER_UA, "Accept": "application/json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-        with self._net_opener() as opener:
-            request = urllib.request.Request(url, headers=headers)
-            with opener.open(request, timeout=30) as response:
-                return json.loads(response.read().decode("utf-8", "replace"))
-
-    @staticmethod
-    def _spotify_track_record(item, album=None):
-        return {
-            "title": str(item.get("name") or "Unknown track"),
-            "artists": ", ".join(
-                str(artist.get("name")) for artist in item.get("artists", [])
-                if artist.get("name")) or "Unknown artist",
-            "album": str((item.get("album") or {}).get("name") or album or ""),
-            "track_number": int(item.get("track_number") or 0),
-        }
-
-    def android_spotify_tracks(self, url):
-        """Resolve a public Spotify track, album or playlist without spotDL.
-
-        Spotify's web player exposes a short-lived anonymous access token. The
-        token is used only for public metadata; audio still comes from the
-        matching YouTube Music result, exactly as it does in spotDL.
-        """
-        match = re.search(
-            r"open\.spotify\.com/(track|album|playlist)/([A-Za-z0-9]+)", url, re.I)
-        if not match:
-            raise ValueError("That is not a Spotify track, album, or playlist link.")
-        kind, item_id = match.group(1).lower(), match.group(2)
-        token_payload = self._spotify_json(
-            "https://open.spotify.com/get_access_token?reason=transport&productType=web_player")
-        token = token_payload.get("accessToken")
-        if not token:
-            raise RuntimeError("Spotify did not provide a public metadata session.")
-
-        base = "https://api.spotify.com/v1"
-        if kind == "track":
-            return [self._spotify_track_record(
-                self._spotify_json(f"{base}/tracks/{item_id}", token))]
-
-        payload = self._spotify_json(f"{base}/{kind}s/{item_id}", token)
-        album = payload.get("name") if kind == "album" else None
-        page = payload.get("tracks") or {}
-        tracks = []
-        while page:
-            for wrapped in page.get("items", []):
-                item = wrapped.get("track") if kind == "playlist" else wrapped
-                if item and not item.get("is_local"):
-                    tracks.append(self._spotify_track_record(item, album))
-            next_url = page.get("next")
-            page = self._spotify_json(next_url, token) if next_url else None
-        if not tracks:
-            raise RuntimeError(f"Spotify returned no downloadable tracks for this {kind}.")
-        return tracks
-
-    def download_with_android_spotify(self, url, output, options):
-        """Android's pure-Python Spotify-to-YouTube-Music download path."""
-        started = time.time()
-        failures = []
-        completed = 0
-        try:
-            from ytmusicapi import YTMusic
-            import mutagen
-            import yt_dlp
-
-            tracks = self.android_spotify_tracks(url)
-            total = len(tracks)
-            self.ui("plan", total, 1, str(output))
-            music = YTMusic()
-
-            for index, track in enumerate(tracks, 1):
-                if not self.is_downloading:
-                    break
-                label = f"{track['artists']} - {track['title']}"
-                self.ui("track", index, total, label[:90])
-                self._batch_log(f"[{index}/{total}] Finding {label}", "download")
-                try:
-                    results = music.search(label, filter="songs", limit=5)
-                    match = next((item for item in results if item.get("videoId")), None)
-                    if not match:
-                        raise RuntimeError("no matching YouTube Music result")
-                    video_url = "https://music.youtube.com/watch?v=" + match["videoId"]
-                    target = unique_path(output, safe_filename(
-                        label, fallback=f"track-{index}", suffix=f".{options['format']}"))
-                    outtmpl = str(target.parent / f"{target.stem}.%(ext)s")
-
-                    def progress(status):
-                        if not self.is_downloading:
-                            raise RuntimeError("Download stopped")
-                        if status.get("status") == "downloading":
-                            match_percent = re.search(
-                                r"([0-9]+(?:\.[0-9]+)?)", status.get("_percent_str", ""))
-                            percent = float(match_percent.group(1)) if match_percent else 0.0
-                            self.ui("progress", percent, status.get("_speed_str", ""),
-                                    status.get("_eta_str", ""))
-
-                    ydl_options = {
-                        "format": "bestaudio/best",
-                        "outtmpl": outtmpl,
-                        "noplaylist": True,
-                        "quiet": True,
-                        "no_warnings": True,
-                        # Same rule as the command-line path: the folder when
-                        # both shims are there, the binary itself when not.
-                        "ffmpeg_location": self.ffmpeg_location(),
-                        "progress_hooks": [progress],
-                        "postprocessors": [{
-                            "key": "FFmpegExtractAudio",
-                            "preferredcodec": options["format"],
-                            "preferredquality": options["quality"],
-                        }],
-                    }
-                    if options["proxy_enabled"] and options["proxy_url"]:
-                        ydl_options["proxy"] = normalize_proxy_url(
-                            options["proxy_url"], options["proxy_type"])
-                    with yt_dlp.YoutubeDL(ydl_options) as downloader:
-                        downloader.download([video_url])
-
-                    if not target.is_file():
-                        candidates = sorted(target.parent.glob(target.stem + ".*"))
-                        target = candidates[-1] if candidates else target
-                    if not target.is_file() or target.stat().st_size == 0:
-                        raise RuntimeError("the audio converter returned no file")
-                    with contextlib.suppress(Exception):
-                        tags = mutagen.File(str(target), easy=True)
-                        if tags is not None:
-                            tags["title"] = [track["title"]]
-                            tags["artist"] = [track["artists"]]
-                            if track["album"]:
-                                tags["album"] = [track["album"]]
-                            if track["track_number"]:
-                                tags["tracknumber"] = [str(track["track_number"])]
-                            tags.save()
-                    completed += 1
-                    self._batch_log(f"Downloaded {target.name}", "success")
-                except Exception as exc:
-                    failures.append(f"{label}: {str(exc)[:140]}")
-                    self._batch_log(f"Skipped {label}: {str(exc)[:140]}", "error")
-
-            self._flush_logs()
-            if not self.is_downloading:
-                self.log("Download stopped.", "warning")
-            elif completed:
-                self.ui("success", max(time.time() - started, 0.1))
-                if failures:
-                    self.notify(
-                        f"Downloaded {completed} track(s); {len(failures)} could not be matched.",
-                        "err")
-            else:
-                raise RuntimeError(failures[0] if failures else "No tracks were downloaded.")
-        except Exception as exc:
-            self._flush_logs()
-            detail = str(exc)[:300]
-            self.log(f"Spotify download failed: {detail}", "error")
-            self.ui("failure", detail)
-        finally:
-            self.ui("finished")
 
     def _prepare_proxy(self, proxy_url, proxy_type):
         return self.network.prepare_for_spotdl(proxy_url, proxy_type)
@@ -3132,22 +2819,19 @@ class SpotifyDownloader:
             return self._po_token
         self._po_token = None
         try:
-            if POTOKEN_MINTER is not None:
-                minted = POTOKEN_MINTER(self.configured_proxy())
-            else:
-                runtime_name, runtime = self.js_runtime()
-                script = bundled_tool("potoken_main.mjs")
-                if runtime_name != "deno" or not runtime or not script:
-                    return None
-                cmd = [runtime, "run", "--allow-net", "--allow-env", "--no-remote",
-                       "--no-check", "--quiet", str(script)]
-                proxy = self.configured_proxy()
-                if proxy:
-                    cmd.append(proxy)
-                result = pyshell.run(cmd, timeout=90)
-                minted = next((json.loads(line) for line in
-                               reversed((result.stdout or "").splitlines())
-                               if line.strip().startswith("{")), None)
+            runtime_name, runtime = self.js_runtime()
+            script = bundled_tool("potoken_main.mjs")
+            if runtime_name != "deno" or not runtime or not script:
+                return None
+            cmd = [runtime, "run", "--allow-net", "--allow-env", "--no-remote",
+                   "--no-check", "--quiet", str(script)]
+            proxy = self.configured_proxy()
+            if proxy:
+                cmd.append(proxy)
+            result = pyshell.run(cmd, timeout=90)
+            minted = next((json.loads(line) for line in
+                           reversed((result.stdout or "").splitlines())
+                           if line.strip().startswith("{")), None)
             if minted and minted.get("poToken") and minted.get("visitorData"):
                 self._po_token = (minted["visitorData"], minted["poToken"])
                 self._batch_log(
@@ -3161,15 +2845,10 @@ class SpotifyDownloader:
     def _resolve_with_youtube_js(self, url):
         """Ask the YouTube.js engine what this video can be fetched as.
 
-        Desktop runs it under the Deno already shipped for yt-dlp's challenge
-        solver, so the engine costs a script and a vendored library rather than
-        another runtime. Android hands the same script to a WebView instead,
-        through the shell — the resolver returns the same shape either way, and
-        everything below this point stops caring which host produced it.
+        It runs under the Deno already shipped for yt-dlp's challenge solver,
+        so the engine costs a script and a vendored library rather than another
+        runtime. The resolver returns a common stream payload consumed below.
         """
-        if YOUTUBEJS_RESOLVER is not None:
-            return YOUTUBEJS_RESOLVER(url, self.configured_proxy())
-
         runtime_name, runtime = self.js_runtime()
         if runtime_name != "deno" or not runtime:
             raise RuntimeError("The YouTube.js engine needs Deno, which this build "
@@ -3224,17 +2903,12 @@ class SpotifyDownloader:
     def _download_with_newpipe(self, url, output, quality, audio_only):
         """Resolve with NewPipeExtractor and fetch with the app's downloader.
 
-        Android reaches the extractor through the shell, because that shell is
-        already a JVM. The desktop runs the same library in a small helper of
-        its own, with a runtime beside it, and both answer in the same JSON —
-        so everything from here down is shared rather than written twice.
+        The standalone JVM helper resolves streams and returns a JSON payload
+        consumed by the same downloader used for every other engine.
         """
         started = time.time()
         self.log_engine_attempt("NewPipe", "resolving", url, quality)
-        if NEWPIPE_RESOLVER is not None:
-            payload = NEWPIPE_RESOLVER(url, self.configured_proxy())
-        else:
-            payload = self._resolve_with_newpipe_jvm(url)
+        payload = self._resolve_with_newpipe_jvm(url)
         if not isinstance(payload, dict):
             raise RuntimeError("NewPipeExtractor returned an invalid response.")
         self.log_engine_attempt(
@@ -3690,18 +3364,7 @@ class SpotifyDownloader:
             cmd += ["--playlist-end", str(limit)]
         if candidate:
             cmd += ytdlp_cookie_args(candidate)
-            # Replay the session as the browser that earned it — but only where
-            # that is actually known. On Android every jar comes from this app's
-            # own WebView, so the agent is certain. A desktop jar may have been
-            # lifted out of Firefox or Edge by --cookies-from-browser, and
-            # announcing Chrome over those cookies would manufacture exactly the
-            # mismatch this is here to avoid.
-            #
-            # YouTube is left out on both: its extractor impersonates a
-            # different client per player_client, and pinning one agent across
-            # all of them contradicts the client it claims to be.
-            if IS_ANDROID and kind not in YOUTUBE_KINDS:
-                cmd += ["--user-agent", BROWSER_UA]
+            # Do not overwrite the browser identity of an imported cookie jar.
 
         # Some extractors and generic pages also ship JavaScript challenges.
         # Supplying Deno is harmless when unused and lets yt-dlp invoke it when
@@ -3758,8 +3421,7 @@ class SpotifyDownloader:
                 # looks, which is worth something when the client we are
                 # claiming is mweb and worth nothing — or worse, a
                 # contradiction — when it is android_vr or tv.
-                if not IS_ANDROID:
-                    cmd += ["--impersonate", "chrome"]
+                cmd += ["--impersonate", "chrome"]
                 provider = self.bgutil_args()
                 if provider:
                     cmd += provider
@@ -3816,25 +3478,11 @@ class SpotifyDownloader:
         # optional browser-impersonation pass. The ladder is climbed when a run says why it
         # failed, and every rung is used at most once — otherwise a jar that can
         # never satisfy the site gets retried forever.
-        # A phone starts on the rung the desktop escalates to. yt-dlp's default
-        # YouTube clients need a proof-of-origin token and a solved JavaScript
-        # challenge; without both, the run is answered with "sign in to confirm
-        # you're not a bot" and then 403 on the media itself. android_vr asks
-        # for neither, so on Android it is the opening move rather than the
-        # consolation — and the ladder above still has its remaining rungs.
-        # ...but only when there is no session to spend. The token-free clients
-        # cannot carry cookies at all, so opening with one where the user has
-        # deliberately signed in would quietly throw their login away and fail
-        # anything members-only or age-gated. A jar keeps the cookie-capable
-        # default, and the ladder is still there underneath it.
-        lead = (YT_CLIENT_LADDER[0]
-                if IS_ANDROID and kind in YOUTUBE_KINDS else None)
-        plan = [{"cookies": c, "clients": lead if (lead and not c) else None,
-                 "impersonate": False, "fresh": False, "po_token": False}
-                for c in cookies]
+        # Start with selected browser or exported cookie jars. Change player
+        # clients only after yt-dlp explains why the current attempt failed.
+        plan = [{"cookies": c, "clients": None, "impersonate": False,
+                 "fresh": False, "po_token": False} for c in cookies]
         spent = set()
-        if lead and all(not step["cookies"] for step in plan):
-            spent.add("clients-0")      # opened with it; do not offer it again
 
         try:
             while plan:
@@ -3962,11 +3610,8 @@ class SpotifyDownloader:
                 return {**attempt, "cookies": None,
                         "clients": YT_CLIENT_LADDER[0], "fresh": True}
 
-            # Last, and only on a desktop: mint a proof-of-origin token and let
-            # the clients that need one back into play. It is last because it
-            # costs a download the first time and a subprocess every time after,
-            # and because everything above it is free.
-            if not IS_ANDROID and BGUTIL_DOWNLOAD_URLS and "po-token" not in spent:
+            # Last, mint a proof-of-origin token and let token-aware clients back in.
+            if BGUTIL_DOWNLOAD_URLS and "po-token" not in spent:
                 spent.add("po-token")
                 self._batch_log(
                     "Everything free has been tried. Fetching a proof-of-origin "
@@ -4136,29 +3781,8 @@ class SpotifyDownloader:
         if kind not in SIGNIN_PAGES or self._login_window is not None:
             return False
 
-        if IS_ANDROID:
-            # A phone has no browser profile to re-read. The live session is in
-            # the system CookieManager — the same place the in-app sign-in put
-            # it — and only the shell can reach that, so it installs the hook.
-            # Without this the stored login is never refreshed, and a rotated
-            # YouTube cookie looks exactly like never having signed in at all.
-            if SESSION_REFRESHER is None:
-                return False
-            try:
-                count, signed_in = SESSION_REFRESHER(kind)
-            except Exception as exc:
-                self.log(f"Could not refresh the {kind.title()} session: {str(exc)[:150]}",
-                         "warning")
-                return False
-            if not signed_in:
-                return False
-            if announce:
-                self.log(f"Refreshed the {kind.title()} session ({count} cookies).",
-                         "success")
-            self.ui("cookie_status", self.cookie_status())
-            return True
-
         window = None
+        try:        window = None
         try:
             window = webview.create_window(
                 f"{kind.title()} session", url=SIGNIN_PAGES[kind][1][0],
@@ -4357,7 +3981,7 @@ class SpotifyDownloader:
             # client just had nothing it could hand over.
             if kind in YOUTUBE_KINDS and YOUTUBE_NO_FORMATS.search(joined):
                 if YOUTUBE_SABR.search(joined):
-                    if NEWPIPE_RESOLVER is not None and "newpipe" in ENGINES.get(kind, ()):
+                    if "newpipe" in ENGINES.get(kind, ()):
                         return "challenge"
                     self._explain_sabr()
                     return None
@@ -4507,15 +4131,12 @@ class SpotifyDownloader:
         else:
             self.ffmpeg_cmd = bundled_tool(f"ffmpeg{EXE}") or shutil.which("ffmpeg")
 
-        self.spotdl_cmd = ("Android Spotify engine" if IS_ANDROID
-                           else self.find_tool("spotdl"))
+        self.spotdl_cmd = self.find_tool("spotdl")
         self.ytdlp_cmd = self.find_tool("yt-dlp")
-        self.deno_cmd = None if IS_ANDROID else self.find_tool("deno")
+        self.deno_cmd = self.find_tool("deno")
 
         required = [("Spotify engine", self.spotdl_cmd), ("yt-dlp", self.ytdlp_cmd),
-                    ("FFmpeg", self.ffmpeg_cmd)]
-        if not IS_ANDROID:
-            required.append(("Deno", self.deno_cmd))
+                    ("FFmpeg", self.ffmpeg_cmd), ("Deno", self.deno_cmd)]
         missing = [label for label, found in required if not found]
         self.ui("components", self.component_summary())
         if not missing:
@@ -4616,11 +4237,8 @@ class SpotifyDownloader:
             return base + audio_args + [
                 "-vn", "-c:a", "aac", "-b:a", f"{bitrate}k", str(target)]
         if output_format == "ogg":
-            audio_codec = "opus" if IS_ANDROID else "libopus"
-            experimental = ["-strict", "-2"] if IS_ANDROID else []
             return base + audio_args + [
-                "-vn", "-c:a", audio_codec, *experimental,
-                "-b:a", f"{bitrate}k", str(target)]
+                "-vn", "-c:a", "libopus", "-b:a", f"{bitrate}k", str(target)]
 
         filters = list(VIDEO_ENHANCEMENT_FILTERS[options["video_enhance"]][:1])
         resize = options["resize"]
@@ -4651,21 +4269,7 @@ class SpotifyDownloader:
         codec = options["codec"]
         preset = "slow" if options["quality"] in {"master", "high"} else (
             "fast" if options["quality"] == "compact" else "medium")
-        if IS_ANDROID:
-            # The APK's FFmpeg uses Android's hardware codecs instead of the
-            # desktop-only libx264/libx265/libvpx libraries. Bitrate is used
-            # because MediaCodec encoders do not accept CRF or x264 presets.
-            android_codec = {
-                "h264": "h264_mediacodec",
-                "h265": "hevc_mediacodec",
-                "vp9": "vp9_mediacodec",
-            }[codec]
-            video_bitrate = {
-                "master": "16M", "high": "10M", "balanced": "6M", "compact": "3M",
-            }[options["quality"]]
-            command = base + ["-c:v", android_codec, "-b:v", video_bitrate,
-                              "-pix_fmt", "yuv420p"]
-        elif codec == "h265":
+        if codec == "h265":        elif codec == "h265":
             command = base + ["-c:v", "libx265", "-preset", preset, "-crf", crf]
             if output_format in {"mp4", "mov"}:
                 command += ["-tag:v", "hvc1"]
@@ -4678,10 +4282,7 @@ class SpotifyDownloader:
                               "-pix_fmt", "yuv420p"]
         command += audio_args
         if output_format == "webm":
-            command += ["-c:a", "opus" if IS_ANDROID else "libopus"]
-            if IS_ANDROID:
-                command += ["-strict", "-2"]
-            command += ["-b:a", f"{bitrate}k"]
+            command += ["-c:a", "libopus", "-b:a", f"{bitrate}k"]
         elif output_format == "avi":
             command += ["-c:a", "libmp3lame", "-b:a", f"{bitrate}k"]
         else:
@@ -4716,8 +4317,7 @@ class SpotifyDownloader:
                 raise RuntimeError("FFmpeg is not ready. Run Check setup first.")
             if not source.is_file():
                 raise RuntimeError("The selected media file no longer exists.")
-            target_parent = (download_dir("converted", self.save_folder.get().strip())
-                             if IS_ANDROID else source.parent)
+            target_parent = source.parent
             target = unique_path(target_parent, safe_filename(
                 source.stem, fallback="converted", suffix=f".{output_format}"))
             partial = target.with_name(target.stem + ".working" + target.suffix)
@@ -4807,34 +4407,13 @@ class SpotifyDownloader:
         if not normalized:
             raise RuntimeError("No readable images were found.")
 
-        # A fixed A4 page prevents tiny or unusually tall webtoon strips from
-        # creating invalid page sizes. Android uses reportlab because img2pdf
-        # depends on pikepdf/qpdf, which has no Android wheel.
-        if IS_ANDROID:
-            from reportlab.lib.pagesizes import A4, landscape
-            from reportlab.lib.utils import ImageReader
-            from reportlab.pdfgen import canvas as pdf_canvas
-
-            document = pdf_canvas.Canvas(str(target), pagesize=A4)
-            for image_path in normalized:
-                with Image.open(image_path) as image:
-                    page = landscape(A4) if image.width > image.height else A4
-                    page_width, page_height = page
-                    document.setPageSize(page)
-                    scale = min(page_width / image.width, page_height / image.height)
-                    width, height = image.width * scale, image.height * scale
-                    document.drawImage(
-                        ImageReader(image_path), (page_width - width) / 2,
-                        (page_height - height) / 2, width, height,
-                        preserveAspectRatio=True)
-                    document.showPage()
-            document.save()
-        else:
-            import img2pdf
-            a4 = (img2pdf.mm_to_pt(210), img2pdf.mm_to_pt(297))
-            layout = img2pdf.get_layout_fun(
-                a4, fit=img2pdf.FitMode.into, auto_orient=True)
-            target.write_bytes(img2pdf.convert(normalized, layout_fun=layout))
+        # Keep page sizing predictable for tall manga pages and mixed image sizes.
+        import img2pdf
+        a4 = (img2pdf.mm_to_pt(210), img2pdf.mm_to_pt(297))
+        layout = img2pdf.get_layout_fun(
+            a4, fit=img2pdf.FitMode.into, auto_orient=True)
+        target.write_bytes(img2pdf.convert(normalized, layout_fun=layout))
+        return len(normalized)
         return len(normalized)
 
     def start_document_conversion(self, path):
@@ -4846,76 +4425,6 @@ class SpotifyDownloader:
             return
         self.is_converting = True
         threading.Thread(target=self.convert_document_file, args=(path,), daemon=True).start()
-
-    @staticmethod
-    def _android_document_to_pdf(source, target):
-        """Render Android-supported text/office/ebook formats to a readable PDF."""
-        from xml.sax.saxutils import escape
-        from reportlab.lib.pagesizes import A4
-        from reportlab.lib.styles import getSampleStyleSheet
-        from reportlab.lib.units import mm
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
-
-        suffix = source.suffix.lower()
-        blocks = []
-        if suffix == ".docx":
-            from docx import Document
-            document = Document(str(source))
-            blocks.extend(paragraph.text for paragraph in document.paragraphs)
-            for table in document.tables:
-                blocks.extend(" | ".join(cell.text for cell in row.cells) for row in table.rows)
-        elif suffix == ".xlsx":
-            from openpyxl import load_workbook
-            workbook = load_workbook(source, read_only=True, data_only=True)
-            for sheet in workbook.worksheets:
-                blocks.append(sheet.title)
-                blocks.extend(" | ".join("" if value is None else str(value) for value in row)
-                              for row in sheet.iter_rows(values_only=True))
-            workbook.close()
-        elif suffix == ".pptx":
-            from pptx import Presentation
-            presentation = Presentation(str(source))
-            for index, slide in enumerate(presentation.slides, 1):
-                blocks.append(f"Slide {index}")
-                blocks.extend(shape.text for shape in slide.shapes if hasattr(shape, "text"))
-        elif suffix in {".odt", ".ods", ".odp"}:
-            from odf import teletype
-            from odf.opendocument import load
-            document = load(str(source))
-            blocks.append(teletype.extractText(document.text))
-        elif suffix == ".epub":
-            from ebooklib import ITEM_DOCUMENT, epub
-            book = epub.read_epub(str(source))
-            for item in book.get_items_of_type(ITEM_DOCUMENT):
-                text = re.sub(r"<[^>]+>", " ", item.get_content().decode("utf-8", "replace"))
-                blocks.append(re.sub(r"\s+", " ", text))
-        elif suffix == ".fb2":
-            import xml.etree.ElementTree as element_tree
-            blocks.append(" ".join(element_tree.parse(source).getroot().itertext()))
-        elif suffix in {".txt", ".csv", ".html", ".htm", ".rtf"}:
-            text = source.read_text("utf-8", "replace")
-            if suffix in {".html", ".htm"}:
-                text = re.sub(r"<[^>]+>", " ", text)
-            elif suffix == ".rtf":
-                text = re.sub(r"\\[A-Za-z]+-?\d* ?|[{}]", "", text)
-            blocks.append(text)
-        else:
-            raise RuntimeError(
-                "This legacy document type needs LibreOffice or Calibre on a desktop build.")
-
-        styles = getSampleStyleSheet()
-        body = styles["BodyText"]
-        body.wordWrap = "CJK"
-        story = []
-        for block in blocks:
-            for paragraph in str(block).replace("\r", "").split("\n"):
-                if paragraph.strip():
-                    story.extend((Paragraph(escape(paragraph.strip()), body), Spacer(1, 2 * mm)))
-        if not story:
-            raise RuntimeError("The selected document contains no readable text.")
-        SimpleDocTemplate(str(target), pagesize=A4, leftMargin=15 * mm,
-                          rightMargin=15 * mm, topMargin=15 * mm,
-                          bottomMargin=15 * mm).build(story)
 
     def start_image_folder_conversion(self, path):
         if self.updating or self.setup_running:
@@ -4942,8 +4451,7 @@ class SpotifyDownloader:
                 raise RuntimeError("No supported images were found in that folder.")
             if len(images) > MANGA_PAGE_LIMIT:
                 raise RuntimeError(f"Image folders are limited to {MANGA_PAGE_LIMIT} pages.")
-            target_parent = (download_dir("converted", self.save_folder.get().strip())
-                             if IS_ANDROID else folder.parent)
+            target_parent = folder.parent
             target = unique_path(target_parent, safe_filename(
                 folder.name, fallback="chapter", suffix=".pdf"))
             partial = target.with_name(target.stem + ".working.pdf")
@@ -4974,8 +4482,7 @@ class SpotifyDownloader:
         try:
             if not source.is_file():
                 raise RuntimeError("The selected document no longer exists.")
-            target_parent = (download_dir("converted", self.save_folder.get().strip())
-                             if IS_ANDROID else source.parent)
+            target_parent = source.parent
             target = unique_path(target_parent, safe_filename(
                 source.stem, fallback="document", suffix=".pdf"))
             partial = target.with_name(target.stem + ".working.pdf")
@@ -5010,9 +4517,6 @@ class SpotifyDownloader:
                     self._write_images_pdf(images, partial, workspace)
                 elif suffix == ".pdf":
                     pdf_rewrite(source, partial)
-                elif IS_ANDROID and suffix in (EBOOK_CONVERT_EXTENSIONS |
-                                               OFFICE_DOCUMENT_EXTENSIONS):
-                    self._android_document_to_pdf(source, partial)
                 elif suffix in EBOOK_CONVERT_EXTENSIONS:
                     converter = self._converter_program("ebook-convert")
                     if not converter:
@@ -5307,7 +4811,7 @@ if __name__ == "__main__":
         # Only in a packaged build. Running from source there is nothing to
         # bundle yet, and the check that matters is the one the frozen
         # executable makes about its own contents.
-        if not IS_ANDROID and getattr(sys, "frozen", False):
+        if getattr(sys, "frozen", False):
             _engine = bundled_tool(f"blueknight-youtube{EXE}")
             assert _engine, "the YoutubeExplode engine is missing from this build"
             _probe = subprocess.run([_engine, "info", "https://youtu.be/",
@@ -5462,20 +4966,13 @@ if __name__ == "__main__":
 
         assert "--extract-audio" in _sc_cmd and "--embed-metadata" not in _sc_cmd
         assert "--cookies" in _sc_cookie_cmd
-        # A replayed session goes out as the browser that earned it, but only
-        # where that is known — which is Android, never the desktop, where the
-        # jar may have come out of Firefox or Edge.
-        assert ("--user-agent" in _sc_cookie_cmd) == IS_ANDROID, _sc_cookie_cmd
-        if IS_ANDROID:
-            assert _sc_cookie_cmd[_sc_cookie_cmd.index("--user-agent") + 1] == BROWSER_UA
-        assert "--user-agent" not in _sc_cmd            # no jar, no claim to make
+        # Imported sessions keep their original browser identity.
+        assert "--user-agent" not in _sc_cookie_cmd
+        assert "--user-agent" not in _sc_cmd
         _yt_cookie_cmd = _app._ytdlp_cmd_for(
             "youtube", "https://youtu.be/g9ilhvSurpQ", Path(tempfile.gettempdir()),
             "best", False, None, ("file", str(Path(tempfile.gettempdir()) / "yt-cookies.txt")))
         assert "--cookies" in _yt_cookie_cmd and "--user-agent" not in _yt_cookie_cmd
-        # The identity is one string everywhere, and it never claims the wrong
-        # kind of device.
-        assert ("Android" in BROWSER_UA) == IS_ANDROID, BROWSER_UA
         # Opening on android_vr must take that rung out of the ladder, or the
         # first escalation would retry what already failed.
         # The rungs that need neither a token nor a solved player come first,
@@ -5505,10 +5002,6 @@ if __name__ == "__main__":
                 for _client in _rung.split(","):
                     assert _client in _YT_CLIENTS or _client == "default", _client
 
-        # A phone can only ever read a jar this app wrote. The desktop half of
-        # this cannot be asserted: whether a browser turns up is a fact about
-        # the machine, not about the code, and a CI runner has none installed.
-        assert not (IS_ANDROID and any(c[0] == "browser" for c in cookie_candidates()))
 
         # When every client has failed carrying a session, the session itself
         # is the thing that has not been varied. Signed out, as the client that
@@ -5677,24 +5170,11 @@ if __name__ == "__main__":
             "ERROR: unable to download video data: HTTP Error 403: Forbidden")
         # Only sources with a second engine may hand off at all.
         assert set(ENGINES) <= set(MEDIA_LABELS), set(ENGINES) - set(MEDIA_LABELS)
-        # The order is the whole design, so it is asserted rather than trusted.
-        #   Desktop: yt-dlp -> YoutubeExplode -> YouTube.js
-        #   Android: yt-dlp -> NewPipe        -> YouTube.js
-        # yt-dlp is first on both and is deliberately absent from this table.
-        if IS_ANDROID:
-            assert ENGINES["youtube"] == ("newpipe", "youtube-js")
-            assert ENGINES["ytmusic"] == ("newpipe", "youtube-js")
-            assert ENGINES["general"][0] == "newpipe"
-            assert not any("youtube-explode" in e for e in ENGINES.values()), (
-                "YoutubeExplode is a .NET engine and desktop-only")
-        else:
-            # The desktop's second engine is the .NET one, and NewPipe is not
-            # available here: it is a JVM library and this package carries no
-            # JVM. yt-dlp is first on both, and is not in this table at all.
-            assert ENGINES["youtube"] == ("youtube-explode", "newpipe", "youtube-js")
-            assert ENGINES["ytmusic"] == ("youtube-explode", "newpipe", "youtube-js")
-            assert ENGINES["general"][:2] == ("youtube-explode", "newpipe")
-            assert ENGINES["soundcloud"] == ("newpipe",)
+        # yt-dlp is the primary engine; these are the desktop fallback engines.
+        assert ENGINES["youtube"] == ("youtube-explode", "newpipe", "youtube-js")
+        assert ENGINES["ytmusic"] == ("youtube-explode", "newpipe", "youtube-js")
+        assert ENGINES["general"][:2] == ("youtube-explode", "newpipe")
+        assert ENGINES["soundcloud"] == ("newpipe",)
 
         assert "gallery-dl" in ENGINES["x"] and "direct" in ENGINES["general"]
         assert ("streamlink", "html5") == tuple(
