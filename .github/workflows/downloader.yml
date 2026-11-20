@@ -11,7 +11,7 @@ name: Downloader
 
 on:
   push:
-    branches: [blue-knight-net, main]
+    branches: [blue-knight-net, main, "refactor/**"]
     # Two names for the same thing: this repository tags its releases
     # "Blueknightv2.1"; the monorepo it is synced from uses "downloader-v*".
     tags: ["downloader-v*", "Blueknightv*"]
@@ -140,6 +140,7 @@ jobs:
   # real binary to launch, not a library binding.
   # --------------------------------------------------------------------------
   android-native:
+    if: ${{ !startsWith(github.ref, 'refs/heads/refactor/') && !startsWith(github.head_ref, 'refactor/') }}
     needs: check
     strategy:
       fail-fast: false
@@ -203,6 +204,7 @@ jobs:
           if-no-files-found: error
 
   android:
+    if: ${{ !startsWith(github.ref, 'refs/heads/refactor/') && !startsWith(github.head_ref, 'refactor/') }}
     needs: [check, android-native]
     strategy:
       fail-fast: false
