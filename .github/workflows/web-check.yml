@@ -12,6 +12,7 @@ on:
     paths:
       - "web/**"
       - "tests/**"
+      - "contracts/**"
       - ".github/workflows/web-check.yml"
   workflow_dispatch:
 

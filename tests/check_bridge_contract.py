@@ -60,8 +60,8 @@ def emitted_events(source: str) -> set[str]:
         if not isinstance(node, ast.Call) or not node.args:
             continue
 
-        # self.ui("event", ...) is forwarded unchanged by drain().
-        if dotted_name(node.func) == "self.ui":
+        # Engine events and Api adapter events are forwarded unchanged by drain().
+        if dotted_name(node.func) in {"self.ui", "self._app.ui"}:
             first = node.args[0]
             if isinstance(first, ast.Constant) and isinstance(first.value, str):
                 emitted.add(first.value)
