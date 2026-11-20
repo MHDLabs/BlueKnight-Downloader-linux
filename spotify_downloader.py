@@ -407,8 +407,8 @@ def validate_engine_update(paths):
         if stream_name != "hls":
             raise RuntimeError("Streamlink plugin loading failed")
         return True
-    except Exception:")
-    return written
+    except Exception:
+        return False
 
 
 # Reading the clipboard is the one thing every desktop does through a different
