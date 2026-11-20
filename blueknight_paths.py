@@ -11,24 +11,12 @@ import time
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Which machine is this.
-#
-# Decided once, here, so the rest of the app can be written without an `if
-# sys.platform` in every function. Android reports itself as Linux, so it is
-# identified by the two environment variables the Android runtime always sets;
-# the check has to come first or Android would be treated as a desktop Linux
-# with a home directory it is not allowed to write to.
+# Which desktop platform is this.
 # ---------------------------------------------------------------------------
-IS_ANDROID = bool(os.environ.get("ANDROID_ROOT") and os.environ.get("ANDROID_DATA"))
-# Android wins over whatever sys.platform says. On a device it reports "linux"
-# so this is moot, but it keeps the flags mutually exclusive — which is what
-# lets a desktop simulate the phone by setting the two Android variables, and
-# stops EXE from becoming ".exe" when it does.
-IS_WINDOWS = sys.platform == "win32" and not IS_ANDROID
-IS_MACOS = sys.platform == "darwin" and not IS_ANDROID
-IS_LINUX = not (IS_WINDOWS or IS_MACOS or IS_ANDROID)
-OS_TAG = ("android" if IS_ANDROID else "win" if IS_WINDOWS
-          else "mac" if IS_MACOS else "linux")
+IS_WINDOWS = sys.platform == "win32"
+IS_MACOS = sys.platform == "darwin"
+IS_LINUX = not (IS_WINDOWS or IS_MACOS)
+OS_TAG = "win" if IS_WINDOWS else "mac" if IS_MACOS else "linux"
 # Only Windows puts a suffix on an executable. Every bundled tool name is built
 # from this, so `yt-dlp.exe` and `yt-dlp` are the same line of code.
 EXE = ".exe" if IS_WINDOWS else ""
@@ -114,10 +102,9 @@ _BROWSER_LABELS = {"opera gx": "Opera GX", "opera crypto": "Opera Crypto",
 def app_dir():
     """The folder the app actually lives in, frozen or not.
 
-    Android has no folder the app both lives in and may write to, so its shell
-    passes one in. On macOS the executable sits three levels down inside the
-    .app bundle, which is read-only and not where a user would look for their
-    downloads; "next to the app" there means next to the bundle.
+    On macOS the executable sits three levels down inside the .app bundle,
+    which is read-only and not where a user would look for downloads; "next to
+    the app" there means next to the bundle.
     """
     override = os.environ.get("BLUEKNIGHT_HOME")
     if override:
@@ -139,8 +126,6 @@ def app_data_dir(name="SpotifyDownloader"):
     override = os.environ.get("BLUEKNIGHT_DATA")
     if override:
         return Path(override)
-    if IS_ANDROID:
-        return app_dir() / "data"
     if IS_WINDOWS:
         base = Path(os.environ.get("LOCALAPPDATA")
                     or Path.home() / "AppData" / "Local")
@@ -389,13 +374,6 @@ def cookie_candidates(domain=None):
     they are the only source nothing else can take away.
     """
     found = [("file", str(path)) for path in cookie_files(domain)]
-    # Android has no browser profile anyone may read, and sys.platform there is
-    # "linux" — so without this the desktop Linux paths get probed on every
-    # cookie decision, and anything that happened to match would be handed to
-    # --cookies-from-browser, which cannot work on a phone. The app's own jar is
-    # the only session that can exist there.
-    if IS_ANDROID:
-        return found
     for name, profile in _BROWSER_DIRS.get(sys.platform, _BROWSER_DIRS["linux"]):
         path = os.path.expanduser(profile)
         if os.path.isdir(path):
