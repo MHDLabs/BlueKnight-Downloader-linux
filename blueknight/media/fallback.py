@@ -114,3 +114,58 @@ def classify_youtube_refusal(spent_clients):
     if refused >= YT_NO_TOKEN_CLIENTS:
         return FAILURE_IP_BLOCKED
     return FAILURE_BOT_CHECK
+
+YOUTUBE_KINDS = {"youtube", "ytmusic"}
+
+
+def plan_next_extractor_retry(kind, attempt, spent, challenge=False,
+                              has_po_token_provider=False):
+    """Plan one extractor-only retry without performing side effects.
+
+    The caller owns the spent set and any logging. Keeping this decision pure
+    makes the one-time retry ladder deterministic and independently testable.
+    The returned mapping contains the spent key, a reason code, and the next
+    attempt dictionary; None means this part of the ladder is exhausted.
+    """
+    if kind == "general" and challenge and "impersonate" not in spent:
+        return {
+            "spent_key": "impersonate",
+            "reason": "impersonate",
+            "attempt": {**attempt, "impersonate": True},
+        }
+
+    if kind not in YOUTUBE_KINDS:
+        return None
+
+    for index, clients in enumerate(YT_CLIENT_LADDER):
+        key = f"clients-{index}"
+        if key not in spent:
+            return {
+                "spent_key": key,
+                "reason": "youtube-client",
+                "attempt": {**attempt, "clients": clients, "fresh": True},
+            }
+
+    # Some signed-in accounts are served no direct URLs on any player client.
+    # One signed-out attempt checks the session as the variable.
+    if attempt.get("cookies") and "no-cookies" not in spent:
+        return {
+            "spent_key": "no-cookies",
+            "reason": "no-cookies",
+            "attempt": {
+                **attempt, "cookies": None,
+                "clients": YT_CLIENT_LADDER[0], "fresh": True,
+            },
+        }
+
+    if has_po_token_provider and "po-token" not in spent:
+        return {
+            "spent_key": "po-token",
+            "reason": "po-token",
+            "attempt": {
+                **attempt, "clients": "mweb,default",
+                "po_token": True, "fresh": True,
+            },
+        }
+
+    return None

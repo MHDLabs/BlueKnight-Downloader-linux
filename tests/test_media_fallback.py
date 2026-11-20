@@ -20,6 +20,7 @@ from blueknight.media.fallback import (
     YTDLP_TELLING_WARNING,
     classify_youtube_refusal,
     may_fall_back,
+    plan_next_extractor_retry,
 )
 
 
@@ -180,3 +181,101 @@ class FallbackEngineOrderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class ExtractorRetryPlannerTests(unittest.TestCase):
+    def setUp(self):
+        self.attempt = {
+            "cookies": None,
+            "clients": None,
+            "impersonate": False,
+            "fresh": False,
+            "po_token": False,
+        }
+
+    def test_general_challenge_uses_browser_impersonation_once(self):
+        spent = set()
+        step = plan_next_extractor_retry("general", self.attempt, spent, challenge=True)
+        self.assertEqual(step["spent_key"], "impersonate")
+        self.assertEqual(step["reason"], "impersonate")
+        self.assertTrue(step["attempt"]["impersonate"])
+        self.assertEqual(spent, set())
+        spent.add(step["spent_key"])
+        self.assertIsNone(
+            plan_next_extractor_retry("general", self.attempt, spent, challenge=True)
+        )
+
+    def test_general_without_challenge_does_not_add_a_retry(self):
+        self.assertIsNone(
+            plan_next_extractor_retry("general", self.attempt, set(), challenge=False)
+        )
+
+    def test_non_youtube_sites_do_not_get_youtube_client_rungs(self):
+        for kind in ("instagram", "tiktok", "x", "soundcloud"):
+            with self.subTest(kind=kind):
+                self.assertIsNone(plan_next_extractor_retry(kind, self.attempt, set()))
+
+    def test_youtube_player_client_ladder_is_returned_in_order(self):
+        spent = set()
+        attempt = dict(self.attempt)
+        for index, clients in enumerate(YT_CLIENT_LADDER):
+            step = plan_next_extractor_retry("youtube", attempt, spent)
+            self.assertEqual(step["spent_key"], f"clients-{index}")
+            self.assertEqual(step["reason"], "youtube-client")
+            self.assertEqual(step["attempt"]["clients"], clients)
+            self.assertTrue(step["attempt"]["fresh"])
+            self.assertNotIn(step["spent_key"], spent)
+            spent.add(step["spent_key"])
+            attempt = step["attempt"]
+        self.assertIsNone(plan_next_extractor_retry("youtube", attempt, spent))
+
+    def test_ytmusic_uses_the_same_player_client_ladder(self):
+        step = plan_next_extractor_retry("ytmusic", self.attempt, set())
+        self.assertEqual(step["attempt"]["clients"], YT_CLIENT_LADDER[0])
+
+    def test_signed_in_youtube_attempt_gets_one_signed_out_retry(self):
+        spent = {f"clients-{i}" for i in range(len(YT_CLIENT_LADDER))}
+        attempt = {**self.attempt, "cookies": ("file", "/tmp/youtube-cookies.txt")}
+        step = plan_next_extractor_retry("youtube", attempt, spent)
+        self.assertEqual(step["spent_key"], "no-cookies")
+        self.assertEqual(step["reason"], "no-cookies")
+        self.assertIsNone(step["attempt"]["cookies"])
+        self.assertEqual(step["attempt"]["clients"], YT_CLIENT_LADDER[0])
+        self.assertTrue(step["attempt"]["fresh"])
+
+    def test_no_saved_cookie_does_not_waste_the_signed_out_rung(self):
+        spent = {f"clients-{i}" for i in range(len(YT_CLIENT_LADDER))}
+        self.assertIsNone(plan_next_extractor_retry("youtube", self.attempt, spent))
+
+    def test_signed_out_retry_can_be_followed_by_one_po_token_retry(self):
+        spent = {f"clients-{i}" for i in range(len(YT_CLIENT_LADDER))}
+        spent.add("no-cookies")
+        step = plan_next_extractor_retry(
+            "youtube", self.attempt, spent, has_po_token_provider=True
+        )
+        self.assertEqual(step["spent_key"], "po-token")
+        self.assertEqual(step["reason"], "po-token")
+        self.assertEqual(step["attempt"]["clients"], "mweb,default")
+        self.assertTrue(step["attempt"]["po_token"])
+        self.assertTrue(step["attempt"]["fresh"])
+
+    def test_po_token_retry_is_not_planned_without_a_provider(self):
+        spent = {f"clients-{i}" for i in range(len(YT_CLIENT_LADDER))}
+        spent.add("no-cookies")
+        self.assertIsNone(
+            plan_next_extractor_retry(
+                "youtube", self.attempt, spent, has_po_token_provider=False
+            )
+        )
+
+    def test_cookie_rung_is_skipped_for_signed_out_attempts(self):
+        spent = {f"clients-{i}" for i in range(len(YT_CLIENT_LADDER))}
+        step = plan_next_extractor_retry(
+            "youtube", self.attempt, spent, has_po_token_provider=True
+        )
+        self.assertEqual(step["spent_key"], "po-token")
+
+    def test_attempt_input_is_not_mutated(self):
+        attempt = {**self.attempt, "cookies": ("file", "/tmp/session.txt")}
+        original = dict(attempt)
+        plan_next_extractor_retry("youtube", attempt, set())
+        self.assertEqual(attempt, original)

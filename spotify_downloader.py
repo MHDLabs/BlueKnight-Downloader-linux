@@ -44,9 +44,9 @@ from blueknight.media.fallback import (
     FAILURE_CDN_403, FAILURE_EXTRACTOR, FAILURE_NO_FORMATS, FAILURE_SABR,
     GENERAL_CHALLENGE, NO_VIDEO_FOR_YTDLP, PO_TOKEN_PATTERN, SIGNIN_DEMANDED,
     TERMINAL_FAILURE, YT_CLIENT_LADDER, YT_COOKIE_CLIENTS, YT_NO_TOKEN_CLIENTS,
-    YOUTUBE_MEDIA_DENIED, YOUTUBE_NO_FORMATS, YOUTUBE_SABR,
+    YOUTUBE_KINDS, YOUTUBE_MEDIA_DENIED, YOUTUBE_NO_FORMATS, YOUTUBE_SABR,
     YTDLP_TELLING_WARNING, classify_youtube_refusal as classify_youtube_refusal_policy,
-    may_fall_back as may_fall_back_policy,
+    may_fall_back as may_fall_back_policy, plan_next_extractor_retry,
 )
 import pyshell
 
@@ -81,7 +81,6 @@ MEDIA_FORMATS = {
 }
 # Sources served by YouTube's extractor, and so subject to its bot checks and
 # its PO-token client dance. YouTube Music is youtube.com wearing a different hat.
-YOUTUBE_KINDS = {"youtube", "ytmusic"}
 # Sources that will not serve anything useful to a logged-out client.
 COOKIE_SOURCES = {"instagram"}
 # Sources that usually work logged out, but sometimes demand a session. They get
@@ -2978,55 +2977,31 @@ class SpotifyDownloader:
         an account. Each rung is spent once, so a jar that can never satisfy the
         site is not retried forever.
         """
-        if kind == "general" and challenge and "impersonate" not in spent:
-            spent.add("impersonate")
-            self._batch_log(
-                "The site returned a browser challenge - retrying with browser impersonation.",
-                "warning")
-            self._flush_logs()
-            return {**attempt, "impersonate": True}
-
-        if kind in YOUTUBE_KINDS:
-            for index, clients in enumerate(YT_CLIENT_LADDER):
-                key = f"clients-{index}"
-                if key in spent:
-                    continue
-                spent.add(key)
+        planned = plan_next_extractor_retry(
+            kind, attempt, spent, challenge=challenge,
+            has_po_token_provider=bool(BGUTIL_DOWNLOAD_URLS))
+        if planned:
+            spent.add(planned["spent_key"])
+            reason = planned["reason"]
+            if reason == "impersonate":
                 self._batch_log(
-                    f"YouTube delivery failed — requesting a fresh media URL as {clients}.",
+                    "The site returned a browser challenge - retrying with browser impersonation.",
                     "warning")
-                self._flush_logs()
-                return {**attempt, "clients": clients, "fresh": True}
-
-            # Every client has failed while carrying the session, so try once
-            # without it. A signed-in request is not strictly the stronger one
-            # on YouTube: some of what it withholds it withholds *because* of
-            # the account — the server-side streaming experiment is selected per
-            # account, and an account in it gets no downloadable stream on any
-            # client, while the same video signed out is served normally. The
-            # session is the thing that has not been varied yet, so vary it.
-            if attempt.get("cookies") and "no-cookies" not in spent:
-                spent.add("no-cookies")
+            elif reason == "youtube-client":
+                self._batch_log(
+                    f"YouTube delivery failed — requesting a fresh media URL as "
+                    f"{planned['attempt']['clients']}.", "warning")
+            elif reason == "no-cookies":
                 self._batch_log(
                     "Every player client failed with the saved session. Trying once "
                     "signed out — some limits belong to the account rather than to "
                     "the video.", "warning")
-                self._flush_logs()
-                # Signed out, as the client that asks YouTube for the least.
-                # That pairing is the one measured to still return a full
-                # format list on a video the signed-in attempts could not get.
-                return {**attempt, "cookies": None,
-                        "clients": YT_CLIENT_LADDER[0], "fresh": True}
-
-            # Last, mint a proof-of-origin token and let token-aware clients back in.
-            if BGUTIL_DOWNLOAD_URLS and "po-token" not in spent:
-                spent.add("po-token")
+            elif reason == "po-token":
                 self._batch_log(
                     "Everything free has been tried. Fetching a proof-of-origin "
                     "token provider and trying the clients that need one.", "warning")
-                self._flush_logs()
-                return {**attempt, "clients": "mweb,default",
-                        "po_token": True, "fresh": True}
+            self._flush_logs()
+            return planned["attempt"]
 
         # The stored login outlives its cookies, because the site rotates them.
         # If this app has ever signed in here, re-read the session before
