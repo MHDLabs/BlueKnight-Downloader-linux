@@ -324,6 +324,14 @@ These checks validate local asset paths, script order, absence of inline code,
 JavaScript syntax, and duplicate shared declarations. They do not replace a
 visual smoke test in the actual Windows WebView and Linux WebKitGTK window.
 
+
+## Desktop architecture
+
+The current module boundaries, WebView bridge contract, Python engine responsibilities
+and staged Rust migration plan are documented in [docs/architecture.md](docs/architecture.md).
+Treat that document as the desktop refactor map; it does not imply that the target
+Rust modules have already been implemented.
+
 ## Licensing
 
 Released under **GPL-3.0** (`GPL-3.0.txt`). Bundled tools keep their own
