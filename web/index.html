@@ -105,7 +105,7 @@
         <button class="btn danger" id="yt-stop" disabled>Stop</button>
       </div>
 
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label>Get</label>
         <div class="segment" id="yt-kind">
           <button data-value="video" aria-pressed="true">Video</button>
@@ -128,7 +128,7 @@
         <input type="text" id="yt-limit" placeholder="all" spellcheck="false">
         <span class="hint">items</span>
       </div>
-      <div class="row" style="padding-top:4px">
+      <div class="row row--offset-top">
         <button class="btn" data-signin="youtube">Sign in to YouTube</button><span class="hint signin-note"></span>
       </div>
       <p class="hint">Only needed when YouTube asks for a bot check. Signing in here opens a real YouTube window and keeps the session for downloads.</p>
@@ -150,12 +150,12 @@
         <button class="btn danger" id="ym-stop" disabled>Stop</button>
       </div>
 
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label for="ym-limit">Playlist limit</label>
         <input type="text" id="ym-limit" placeholder="all" spellcheck="false">
         <span class="hint">tracks</span>
       </div>
-      <div class="row" style="padding-top:4px">
+      <div class="row row--offset-top">
         <button class="btn" data-signin="youtube">Sign in to YouTube</button><span class="hint signin-note"></span>
       </div>
       <p class="hint">YouTube Music uses your YouTube account, so signing in on either page covers both. A library or Liked-songs link needs that session; public playlists do not.</p>
@@ -175,7 +175,7 @@
         <button class="btn danger" id="tt-stop" disabled>Stop</button>
       </div>
 
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label>Video quality</label>
         <div class="segment" id="tt-quality">
           <button data-value="best" aria-pressed="true">Best</button>
@@ -208,12 +208,12 @@
         <button class="btn danger" id="ig-stop" disabled>Stop</button>
       </div>
 
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label for="ig-limit">Profile limit</label>
         <input type="text" id="ig-limit" placeholder="all" spellcheck="false">
         <span class="hint">posts</span>
       </div>
-      <div class="row" style="padding-top:4px">
+      <div class="row row--offset-top">
         <button class="btn" data-signin="instagram">Sign in to Instagram</button><span class="hint signin-note"></span>
       </div>
       <p class="hint warn">Instagram serves almost nothing logged out. Sign in above — the app opens a real Instagram window and keeps the session itself. A browser you are already logged into works too, as long as it is closed.</p>
@@ -232,12 +232,12 @@
         <button class="btn primary" id="sc-go">Download</button>
         <button class="btn danger" id="sc-stop" disabled>Stop</button>
       </div>
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label for="sc-limit">Collection limit</label>
         <input type="text" id="sc-limit" placeholder="all" spellcheck="false">
         <span class="hint">tracks</span>
       </div>
-      <div class="row" style="padding-top:4px">
+      <div class="row row--offset-top">
         <button class="btn" data-signin="soundcloud">Sign in to SoundCloud</button><span class="hint signin-note"></span>
       </div>
       <p class="hint warn">SoundCloud Go/Go+ members can sign in to use streams their account is entitled to. The app never bypasses DRM; a track that remains DRM-encrypted cannot be downloaded.</p>
@@ -256,7 +256,7 @@
         <button class="btn primary" id="x-go">Download</button>
         <button class="btn danger" id="x-stop" disabled>Stop</button>
       </div>
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label>Video quality</label>
         <div class="segment" id="x-quality">
           <button data-value="best" aria-pressed="true">Best</button>
@@ -266,7 +266,7 @@
         </div>
         <span></span>
       </div>
-      <div class="row" style="padding-top:4px">
+      <div class="row row--offset-top">
         <button class="btn" data-signin="x">Sign in to X</button><span class="hint signin-note"></span>
       </div>
       <p class="hint">Video is fetched with yt-dlp. When a post carries no video — a photo, a GIF, a multi-image post — the app falls through to gallery-dl automatically, so every media type on X lands the same way. Public posts usually work without signing in; use sign-in for followers-only or age-gated posts.</p>
@@ -285,7 +285,7 @@
         <button class="btn primary" id="gen-go">Download</button>
         <button class="btn danger" id="gen-stop" disabled>Stop</button>
       </div>
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label>Get</label>
         <div class="segment" id="gen-kind">
           <button data-value="video" aria-pressed="true">Video</button>
@@ -324,7 +324,7 @@
         <button class="btn primary" id="pdf-go">Download</button>
         <button class="btn danger" id="pdf-stop" disabled>Stop</button>
       </div>
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label>Download type</label>
         <div class="segment" id="doc-kind">
           <button data-value="document" aria-pressed="true">Document / ebook</button>
@@ -332,7 +332,7 @@
         </div>
         <span></span>
       </div>
-      <div class="field" style="padding-top:16px">
+      <div class="field field--offset-top">
         <label for="pdf-limit" id="doc-limit-label">Link limit</label>
         <input type="text" id="pdf-limit" placeholder="200" spellcheck="false">
         <span class="hint" id="doc-limit-unit">links checked</span>
@@ -427,7 +427,7 @@
           <button class="btn" id="browse">Browse</button>
         </div>
         <p class="hint" id="folder-note">Files are named <b>Artist - Title</b>. The folder is created if it does not exist.</p>
-        <div class="row" style="padding:8px 2px">
+        <div class="row row--settings-padding">
           <button class="btn" id="open-folder">Open folder</button>
           <button class="btn" id="convert">Convert MP3 â†’ FLAC</button>
         </div>
@@ -577,7 +577,7 @@
         <p class="hint">Image folders are merged recursively in natural filename order: page2 comes before page10. Unreadable files and tracking pixels are skipped.</p>
 
         <div class="group-head"><span>Components</span><span class="line"></span></div>
-        <div class="row" style="padding:2px">
+        <div class="row row--compact-padding">
           <button class="btn" id="check-setup">Check setup</button>
           <button class="btn" id="update-components">Update all components</button>
           <button class="btn" id="about">About</button>
@@ -654,7 +654,7 @@
     <p id="gate-detail">First launch takes a moment.</p>
     <div class="gate-bar"></div>
     <div class="gate-detail">Fetching FFmpeg and spotDL</div>
-    <button class="btn" id="gate-skip" hidden style="margin-top:18px">Continue anyway</button>
+    <button class="btn" id="gate-skip" hidden>Continue anyway</button>
   </div>
 </div>
 

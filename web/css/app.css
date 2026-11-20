@@ -1751,3 +1751,10 @@ html.android .nav button .dot { display: none; }
   * { animation: none !important; transition: none !important; }
   body.busy .eq i { height: 12px; }
 }
+
+/* Layout adjustments formerly embedded in index.html. */
+.field--offset-top { padding-top: 16px; }
+.row--offset-top { padding-top: 4px; }
+.row--settings-padding { padding: 8px 2px; }
+.row--compact-padding { padding: 2px; }
+#gate-skip { margin-top: 18px; }
