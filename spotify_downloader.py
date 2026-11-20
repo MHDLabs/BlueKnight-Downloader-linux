@@ -1757,23 +1757,32 @@ class SpotifyDownloader:
             size = 0
         done = len(head)
         self.ui("file", path.name, 0)
-        with partial.open("wb") as out:
-            out.write(head)
-            while self.is_downloading:
-                chunk = response.read(256 * 1024)
-                if not chunk:
-                    break
-                out.write(chunk)
-                done += len(chunk)
-                now = time.time()
-                if now - self.last_ui_update >= UI_UPDATE_INTERVAL:
-                    self.last_ui_update = now
-                    pct = (done / size * 100) if size else 0
-                    self.ui("bytes", pct, path.name, f"{done / 1048576:.1f}MiB", "", 0)
-        if not self.is_downloading:
-            partial.unlink(missing_ok=True)
-            return None
-        os.replace(partial, path)
+        try:
+            with partial.open("wb") as out:
+                out.write(head)
+                while self.is_downloading:
+                    chunk = response.read(256 * 1024)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    done += len(chunk)
+                    now = time.time()
+                    if now - self.last_ui_update >= UI_UPDATE_INTERVAL:
+                        self.last_ui_update = now
+                        pct = (done / size * 100) if size else 0
+                        self.ui("bytes", pct, path.name, f"{done / 1048576:.1f}MiB", "", 0)
+            if not self.is_downloading:
+                with contextlib.suppress(OSError):
+                    partial.unlink(missing_ok=True)
+                return None
+            if size and done != size:
+                raise RuntimeError(
+                    f"The server closed the media file early ({done} of {size} bytes).")
+            os.replace(partial, path)
+        except Exception:
+            with contextlib.suppress(OSError):
+                partial.unlink(missing_ok=True)
+            raise
         self.ui("track", index, total, path.name[:90])
         return path
 
@@ -1922,23 +1931,33 @@ class SpotifyDownloader:
         done = 0
         handle = stream.open()
         try:
-            with partial.open("wb") as target:
-                while self.is_downloading:
-                    chunk = handle.read(256 * 1024)
-                    if not chunk:
-                        break
-                    target.write(chunk)
-                    done += len(chunk)
-                    now = time.time()
-                    if now - self.last_ui_update >= UI_UPDATE_INTERVAL:
-                        self.last_ui_update = now
-                        self.ui("bytes", 0, raw.name, f"{done / 1048576:.1f}MiB", "", 0)
-        finally:
-            handle.close()
-        if not done:
-            partial.unlink(missing_ok=True)
-            return None
-        os.replace(partial, raw)
+            try:
+                with partial.open("wb") as target:
+                    while self.is_downloading:
+                        chunk = handle.read(256 * 1024)
+                        if not chunk:
+                            break
+                        target.write(chunk)
+                        done += len(chunk)
+                        now = time.time()
+                        if now - self.last_ui_update >= UI_UPDATE_INTERVAL:
+                            self.last_ui_update = now
+                            self.ui("bytes", 0, raw.name, f"{done / 1048576:.1f}MiB", "", 0)
+            finally:
+                handle.close()
+        except Exception:
+            with contextlib.suppress(OSError):
+                partial.unlink(missing_ok=True)
+            raise
+        try:
+            if not done:
+                partial.unlink(missing_ok=True)
+                return None
+            os.replace(partial, raw)
+        except Exception:
+            with contextlib.suppress(OSError):
+                partial.unlink(missing_ok=True)
+            raise
 
         codec = self.download_format.get() if self.download_format.get() in {"mp3", "flac"} else "mp3"
         target = raw.with_suffix(f".{codec}" if audio_only else ".mp4")
@@ -2058,6 +2077,10 @@ class SpotifyDownloader:
                                   else "not media")
                         self._batch_log(f"Skipped {media_url[:70]}: {reason}", "warning")
                 except Exception as exc:
+                    if not self.is_downloading:
+                        break
+                    if not self.may_fall_back(str(exc)):
+                        raise
                     self._batch_log(f"Skipped {media_url[:70]}: {str(exc)[:80]}", "warning")
         self._flush_logs()
         return saved
