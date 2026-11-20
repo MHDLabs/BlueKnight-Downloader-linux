@@ -6,7 +6,9 @@ import json
 import os
 import platform
 import re
+import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -117,21 +119,16 @@ def app_dir():
     return Path(__file__).resolve().parent
 
 
-def app_data_dir(name="SpotifyDownloader"):
-    """Writable application state, with an opt-in portable package mode.
 
-    Official desktop archives include a portable.mode marker beside the
-    executable. In that mode, updateable tools and application-managed data
-    live below data/ next to the program. Without the marker, the normal
-    per-user platform data directory is used. BLUEKNIGHT_DATA always takes
-    precedence. The portable directory must be writable.
-    """
-    override = os.environ.get("BLUEKNIGHT_DATA")
-    if override:
-        return Path(override)
-    home = app_dir()
-    if (home / "portable.mode").is_file():
-        return home / "data" / name
+# Only updater-managed application data is eligible for the portable migration.
+# Downloads and cookie sessions deliberately live outside this directory.
+_PORTABLE_MIGRATION_DIRS = ("tools", "ffmpeg", "plugins", "python-engines")
+_PORTABLE_MIGRATION_MARKER = ".portable-migration-v1"
+_PORTABLE_TRANSIENT_SUFFIXES = (".part", ".new", ".tmp", ".lock")
+
+
+def _user_data_dir(name):
+    """The normal per-user data location, regardless of portable mode."""
     if IS_WINDOWS:
         base = Path(os.environ.get("LOCALAPPDATA")
                     or Path.home() / "AppData" / "Local")
@@ -141,6 +138,191 @@ def app_data_dir(name="SpotifyDownloader"):
         base = Path(os.environ.get("XDG_DATA_HOME")
                     or Path.home() / ".local" / "share")
     return base / name
+
+
+def _is_portable_transient(name):
+    return name.lower().endswith(_PORTABLE_TRANSIENT_SUFFIXES)
+
+
+def _write_text_atomically(path, content):
+    """Replace one small metadata file only after its full contents are ready."""
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=path.parent,
+                prefix=f".{path.name}-", suffix=".tmp", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        os.replace(temporary, path)
+        return True
+    except OSError:
+        return False
+    finally:
+        if temporary is not None:
+            with contextlib.suppress(OSError):
+                temporary.unlink()
+
+
+def _copy_portable_tree(source, destination):
+    """Copy missing regular files, never following symlinks or replacing files."""
+    if source.is_symlink() or not source.is_dir():
+        return True
+    if destination.is_symlink():
+        return False
+
+    try:
+        destination.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return False
+    if destination.is_symlink() or not destination.is_dir():
+        return False
+
+    complete = True
+    walk_errors = []
+
+    def remember_walk_error(error):
+        walk_errors.append(error)
+
+    for current, directories, filenames in os.walk(
+            source, topdown=True, followlinks=False, onerror=remember_walk_error):
+        current_path = Path(current)
+        directories[:] = [
+            name for name in directories
+            if not (current_path / name).is_symlink()
+            and not _is_portable_transient(name)
+        ]
+        relative = current_path.relative_to(source)
+        destination_dir = destination / relative
+        try:
+            destination_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            complete = False
+            directories.clear()
+            continue
+        if destination_dir.is_symlink() or not destination_dir.is_dir():
+            complete = False
+            directories.clear()
+            continue
+
+        for name in filenames:
+            if _is_portable_transient(name):
+                continue
+            source_file = current_path / name
+            if source_file.is_symlink() or not source_file.is_file():
+                continue
+            destination_file = destination_dir / name
+            if os.path.lexists(destination_file):
+                continue
+            try:
+                shutil.copy2(source_file, destination_file)
+            except FileExistsError:
+                # A file created by another process wins; never overwrite it.
+                continue
+            except OSError:
+                # Remove a partial file produced by a failed copy so a later
+                # launch can retry instead of treating it as migrated data.
+                with contextlib.suppress(OSError):
+                    destination_file.unlink()
+                complete = False
+
+    return complete and not walk_errors
+
+
+def _rebase_portable_engine_registry(source_root, destination_root):
+    """Rewrite copied absolute wheel paths to their new portable location."""
+    source_engines = (source_root / "python-engines").resolve()
+    destination_engines = (destination_root / "python-engines").resolve()
+    registry = destination_engines / "registry.json"
+    if not os.path.lexists(registry):
+        return True
+    if registry.is_symlink() or not registry.is_file():
+        return False
+
+    try:
+        records = json.loads(registry.read_text("utf-8"))
+    except (OSError, ValueError):
+        # A malformed old registry is already ignored by the updater. Do not
+        # block migration of otherwise usable native tools because of it.
+        return True
+    if not isinstance(records, dict):
+        return True
+
+    changed = False
+    for record in records.values():
+        if not isinstance(record, dict) or not isinstance(record.get("path"), str):
+            continue
+        try:
+            old_path = Path(record["path"]).expanduser().resolve()
+            relative = old_path.relative_to(source_engines)
+            new_path = destination_engines / relative
+        except (OSError, ValueError):
+            continue
+        if new_path.is_dir():
+            record["path"] = str(new_path.resolve())
+            changed = True
+
+    if not changed:
+        return True
+    return _write_text_atomically(registry, json.dumps(records, indent=2) + "\n")
+
+
+def _migrate_portable_data(source_root, destination_root):
+    """One-time copy of known managed data; the original user data is retained."""
+    marker = destination_root / _PORTABLE_MIGRATION_MARKER
+    if os.path.lexists(marker):
+        return
+
+    try:
+        if source_root.resolve() == destination_root.resolve():
+            return
+    except OSError:
+        return
+
+    sources = []
+    for name in _PORTABLE_MIGRATION_DIRS:
+        source = source_root / name
+        if source.is_dir() and not source.is_symlink():
+            sources.append((source, destination_root / name))
+    if not sources:
+        return
+
+    try:
+        destination_root.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
+
+    complete = True
+    for source, destination in sources:
+        if not _copy_portable_tree(source, destination):
+            complete = False
+    if not complete:
+        return
+    if not _rebase_portable_engine_registry(source_root, destination_root):
+        return
+
+    _write_text_atomically(marker, "portable-migration-v1\\n")
+
+
+def app_data_dir(name="SpotifyDownloader"):
+    """Writable application state, with an opt-in portable package mode.
+
+    Official desktop archives include a portable.mode marker beside the
+    executable. In that mode, updater-managed data lives below data/ next to
+    the program. On first use, known managed folders are copied from the old
+    per-user location without deleting or overwriting anything. Downloads and
+    cookie sessions are not part of this migration. BLUEKNIGHT_DATA always
+    takes precedence and disables automatic migration.
+    """
+    override = os.environ.get("BLUEKNIGHT_DATA")
+    if override:
+        return Path(override)
+    home = app_dir()
+    if (home / "portable.mode").is_file():
+        destination = home / "data" / name
+        _migrate_portable_data(_user_data_dir(name), destination)
+        return destination
+    return _user_data_dir(name)
+
 
 
 def download_root(base=None):

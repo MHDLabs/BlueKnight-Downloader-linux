@@ -39,9 +39,12 @@ Priorities:
 
 1. Verify the actual GUI on a Linux desktop using the packaged executable,
    including first launch, theme/layout, sign-in windows and error handling.
-2. Verify portable data paths, write permissions, upgrades and behaviour when
-   the marker is absent. Decide how to reuse existing per-user tool data when
-   moving from an older non-portable build.
+2. Verify portable data paths, write permissions and upgrades. Portable mode
+   now performs a one-time, copy-only migration of tools, FFmpeg, plugins and
+   Python-engine updates from the old per-user directory. It never deletes
+   source data or overwrites files already present in the portable destination;
+   cookies, downloads and unrelated folders are excluded. Deterministic tests
+   cover interrupted retries, registry path rebasing and marker/override rules.
 3. Add deterministic tests for tool discovery, downloads, process exit,
    cancellation, proxy routing, cookie/session handling and conversion paths.
 4. Run controlled end-to-end checks for representative sources and formats:
