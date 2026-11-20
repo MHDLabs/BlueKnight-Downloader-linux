@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import os
 import ssl
 import unittest
+from unittest.mock import patch
 import urllib.request
 from urllib.parse import urlsplit
 
@@ -109,11 +111,15 @@ class ProxyManagerTests(unittest.TestCase):
 
     def test_network_opener_has_no_proxy_when_disabled(self):
         self.settings["enabled"] = False
-        with self.manager.net_opener() as opener:
-            self.assertFalse(any(
-                isinstance(item, urllib.request.ProxyHandler)
-                for item in opener.handlers
-            ))
+        # urllib installs its own default ProxyHandler. With the environment
+        # cleared, that default handler must remain empty when app proxy is off.
+        with patch.dict(os.environ, {}, clear=True):
+            with self.manager.net_opener() as opener:
+                handler = next(
+                    item for item in opener.handlers
+                    if isinstance(item, urllib.request.ProxyHandler)
+                )
+                self.assertEqual(handler.proxies, {})
 
     def test_spotdl_adapter_does_not_create_bridge_for_http(self):
         proxy, bridge = self.manager.prepare_for_spotdl(
