@@ -1,13 +1,16 @@
 # Blue Knight Downloader
 
-A single-file Windows app that downloads from **Spotify, YouTube, YouTube
-Music, TikTok, Instagram, SoundCloud, X, PDF/ebook documents, and other
-yt-dlp-supported video sites**, sorts what it fetches, and handles restricted
+A desktop app for downloading from **Spotify, YouTube, YouTube Music,
+TikTok, Instagram, SoundCloud, X, PDF/ebook documents, and other
+yt-dlp-supported video sites**, sorting what it fetches, and handling restricted
 networks and common sign-in walls.
 
-No install, no Python, no command line. ffmpeg, spotDL, yt-dlp, Deno, Streamlink,
-gallery-dl and the document conversion libraries ship inside the executable.
-The **Update all components** button checks every bundled downloader and converter,
+The desktop builds target Windows and Linux, with a macOS build also maintained.
+The downloader currently uses a Python engine and a local WebView interface.
+The interface is split into HTML, CSS and ordered JavaScript files; the engine
+and platform packaging are being modularized without dropping existing features.
+
+The **Update all components** button checks bundled downloaders and converters,
 verifies Python wheels against PyPI's SHA-256 digest, and activates validated
 Python updates on restart.
 
@@ -279,14 +282,46 @@ certificate instead of receiving a new CI debug key on every build.
 
 | File | Role |
 | --- | --- |
-| `spotify_downloader.py` | engine, download logic, the bridge the page talks to |
-| `web/index.html` | the entire interface — markup, style and script |
+| `spotify_downloader.py` | current desktop engine, download logic, Python bridge |
 | `blueknight_paths.py` | download folders, cookie discovery, the jar registry |
-| `instagram.py`, `youtubedl.py`, `tiktok.py` | standalone CLI versions |
-| `build_portable.ps1` | one-file build |
-| `android/` | Kotlin/Chaquopy Android shell and four-ABI release builds |
+| `web/index.html` | interface markup and asset loading order |
+| `web/css/app.css` | interface styling |
+| `web/js/` | ordered classic scripts for shell, routing, controls and runtime |
+| `web/js/README.md` | frontend module responsibilities and loading constraints |
+| `tests/check_web_assets.py` | local HTML/CSS asset reference checks |
+| `tests/check_web_scripts.mjs` | JavaScript syntax and shared-binding checks |
+| `build_portable.ps1` | Windows desktop build |
+| `build_portable.sh` | Linux/macOS desktop build |
+| `android/` | existing Android project, outside the current desktop refactor |
 
 `blueknight_paths.py` runs its own checks with `python blueknight_paths.py`.
+
+## Web interface
+
+The desktop WebView opens `web/index.html` from the local filesystem. Keep its
+asset references relative and do not switch the frontend files to ES modules
+without replacing and testing the local-file loading strategy.
+
+The classic scripts are loaded in this order:
+
+1. `web/js/shell.js`
+2. `web/js/routing.js`
+3. `web/js/components.js`
+4. `web/js/runtime.js`
+
+The scripts share the page's global lexical scope, so top-level declaration
+names must remain unique and the order must not change casually.
+
+Run the frontend checks before submitting UI changes:
+
+```bash
+python tests/check_web_assets.py
+node tests/check_web_scripts.mjs
+```
+
+These checks validate local asset paths, script order, absence of inline code,
+JavaScript syntax, and duplicate shared declarations. They do not replace a
+visual smoke test in the actual Windows WebView and Linux WebKitGTK window.
 
 ## Licensing
 

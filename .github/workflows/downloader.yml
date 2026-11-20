@@ -11,7 +11,7 @@ name: Downloader
 
 on:
   push:
-    branches: [main]
+    branches: [blue-knight-net, main]
     # Two names for the same thing: this repository tags its releases
     # "Blueknightv2.1"; the monorepo it is synced from uses "downloader-v*".
     tags: ["downloader-v*", "Blueknightv*"]
