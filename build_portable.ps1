@@ -78,9 +78,8 @@ $ExtraArgs += @("--add-data", "$YtjsDir;tools")
 $NewPipeJar = Join-Path $Vendor "blueknight-newpipe.jar"
 if (-not (Test-Path -LiteralPath $NewPipeJar) -and (Get-Command java -ErrorAction SilentlyContinue)) {
     Write-Host "  building the NewPipe engine"
-    # The Android project's wrapper, rather than a second copy of Gradle for a
-    # one-module helper.
-    & (Join-Path $Root "android/gradlew.bat") -p (Join-Path $Root "jvm/newpipe") `
+    # The JVM helper owns this wrapper independently of the removed mobile app.
+    & (Join-Path $Root "jvm/gradlew.bat") -p (Join-Path $Root "jvm/newpipe") `
         --no-daemon -q shadowJar
     if ($LASTEXITCODE -ne 0) { throw "the NewPipe engine failed to build" }
     Copy-Item (Join-Path $Root "jvm/newpipe/build/libs/blueknight-newpipe.jar") `

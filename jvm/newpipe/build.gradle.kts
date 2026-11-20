@@ -4,18 +4,15 @@ plugins {
 }
 
 /*
- * The desktop's third YouTube engine.
+ * The desktop's NewPipeExtractor fallback.
  *
- * NewPipeExtractor is a JVM library, which is why the phone has had it since
- * before the desktop did — the Android shell is already a JVM. The desktop is
- * Python, so the extractor runs in a small helper of its own and answers in
- * the same JSON the Android adapter produces. Everything above that point in
- * the app is shared: the same stream picking, the same downloader, the same
- * progress and cancellation.
+ * NewPipeExtractor is a JVM library. The desktop runs it in a small standalone
+ * helper which returns a JSON stream manifest to the Python downloader. The
+ * common desktop code remains responsible for stream selection, fetching,
+ * progress reporting and cancellation.
  *
- * A fat jar rather than a directory of dependencies, and a runtime built with
- * jlink beside it, so the desktop package carries a JVM the size of the parts
- * it uses instead of asking anyone to install Java.
+ * A fat jar and a jlink runtime keep the Java dependency self-contained in the
+ * desktop package instead of asking users to install Java separately.
  */
 repositories {
     mavenCentral()

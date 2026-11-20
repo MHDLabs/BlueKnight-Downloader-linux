@@ -28,7 +28,7 @@ import org.schabi.newpipe.extractor.stream.VideoStream;
 /**
  * The desktop's NewPipeExtractor engine.
  *
- * Prints one JSON object and exits, in the same shape the Android adapter
+ * Prints one JSON object and exits using the desktop resolver protocol
  * produces — so everything above this point in the app is shared between the
  * two platforms rather than written twice. This resolves only; the app's own
  * downloader fetches, because it already knows about proxies, progress, part
@@ -62,7 +62,7 @@ public final class Main {
         }
     }
 
-    /** The same keys the Android adapter emits, so one reader serves both. */
+    /** Keys in the desktop resolver protocol consumed by the Python downloader. */
     private static JSONObject describe(StreamInfo info) {
         final JSONArray audio = new JSONArray();
         for (AudioStream stream : info.getAudioStreams()) {

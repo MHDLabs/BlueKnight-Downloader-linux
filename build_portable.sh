@@ -173,9 +173,8 @@ PYI_ARGS+=(--add-data "$ROOT/engines/youtubejs:tools")
 NEWPIPE_JAR="$VENDOR/blueknight-newpipe.jar"
 if [ ! -f "$NEWPIPE_JAR" ] && command -v java >/dev/null 2>&1; then
     echo "  building the NewPipe engine"
-    # The Android project's wrapper, rather than a second copy of Gradle for a
-    # one-module helper.
-    sh "$ROOT/android/gradlew" -p "$ROOT/jvm/newpipe" --no-daemon -q shadowJar
+    # The JVM helper owns this wrapper independently of the removed mobile app.
+    sh "$ROOT/jvm/gradlew" -p "$ROOT/jvm/newpipe" --no-daemon -q shadowJar
     cp "$ROOT/jvm/newpipe/build/libs/blueknight-newpipe.jar" "$NEWPIPE_JAR"
 fi
 if [ -f "$NEWPIPE_JAR" ]; then

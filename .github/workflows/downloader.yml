@@ -1,8 +1,7 @@
-# Blue Knight Downloader — every platform it runs on.
+# Blue Knight Downloader — Windows and Linux desktop packages.
 #
-# PyInstaller cannot cross-compile: a Linux binary has to be produced on Linux
-# and a macOS bundle on macOS. That is the whole reason this workflow exists
-# rather than a script someone runs on their own machine.
+# PyInstaller cannot cross-compile: Windows and Linux packages are produced on
+# their native runners. That is why this workflow uses separate platform jobs.
 #
 # The repository at the root holds a second, unrelated app (White Booster) with
 # its own release.yml on the "v*" tags. This one answers to "downloader-v*" so
@@ -51,7 +50,6 @@ jobs:
         include:
           - { os: windows-latest,   target: windows-x64 }
           - { os: ubuntu-24.04,     target: linux-x64 }
-          - { os: macos-14,         target: macos-arm64 }  # Apple Silicon
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +76,7 @@ jobs:
           pip install -r requirements.txt
 
       # pywebview draws through WebKitGTK on Linux and fails at import without
-      # it. On Windows it uses WebView2 and on macOS WKWebView, both built in.
+      # it. Windows uses the WebView2 runtime.
       # Install the Python dependencies first: after PYTHONPATH is exported,
       # pip would otherwise see Ubuntu's protected system copy of itself.
       - name: Install WebKitGTK
@@ -99,8 +97,8 @@ jobs:
         shell: pwsh
         run: ./build_portable.ps1
 
-      - name: Build (Linux and macOS)
-        if: matrix.os != 'windows-latest'
+      - name: Build (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
 
         run: bash ./build_portable.sh
 
@@ -120,12 +118,6 @@ jobs:
 
         run: ./release/BlueKnightDownloader --self-test
 
-      - name: Smoke test the macOS package
-        if: startsWith(matrix.os, 'macos')
-
-        run: |
-          ./release/BlueKnightDownloader.app/Contents/MacOS/BlueKnightDownloader --self-test
-
       - uses: actions/upload-artifact@v4
         with:
           name: blueknight-${{ matrix.target }}
@@ -134,178 +126,8 @@ jobs:
             release/*.tar.gz
           if-no-files-found: error
 
-  # --------------------------------------------------------------------------
-  # Android. FFmpeg is cross-compiled here rather than downloaded: nothing
-  # publishes an FFmpeg executable for Android any more, and yt-dlp needs a
-  # real binary to launch, not a library binding.
-  # --------------------------------------------------------------------------
-  android-native:
-    if: ${{ !startsWith(github.ref, 'refs/heads/refactor/') && !startsWith(github.head_ref, 'refactor/') }}
-    needs: check
-    strategy:
-      fail-fast: false
-      matrix:
-        abi: [arm64-v8a, armeabi-v7a, x86, x86_64]
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install the x86 assembler
-        if: matrix.abi == 'x86_64'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends nasm
-
-      # Each architecture has its own cache and isolated compiler work tree.
-      # Reusing either across ABIs can silently put ARM objects in an x86 APK.
-      - name: Cache native tools for ${{ matrix.abi }}
-        id: natives-cache
-        uses: actions/cache@v4
-        with:
-          path: android/app/src/main/jniLibs/${{ matrix.abi }}
-          key: natives-android-${{ matrix.abi }}-${{ hashFiles('android/build_ffmpeg_android.sh', 'android/build_quickjs_android.sh') }}
-
-      - name: Build FFmpeg and LAME for ${{ matrix.abi }}
-        if: steps.natives-cache.outputs.cache-hit != 'true'
-        env:
-          ABI: ${{ matrix.abi }}
-        working-directory: android
-        run: bash ./build_ffmpeg_android.sh
-
-      # yt-dlp solves YouTube's signature challenge with a JavaScript engine and
-      # defaults to Deno, which has no Android build. Without an engine the
-      # media URL is unsigned and every YouTube download returns HTTP 403.
-      - name: Build QuickJS for ${{ matrix.abi }}
-        if: steps.natives-cache.outputs.cache-hit != 'true'
-        env:
-          ABI: ${{ matrix.abi }}
-        working-directory: android
-        run: bash ./build_quickjs_android.sh
-
-      - name: Verify native executables
-        env:
-          ABI: ${{ matrix.abi }}
-        working-directory: android
-        run: |
-          for tool in libffmpeg libffprobe libquickjs; do
-            test -s "app/src/main/jniLibs/$ABI/$tool.so" \
-              || { echo "missing $tool.so for $ABI"; exit 1; }
-            file "app/src/main/jniLibs/$ABI/$tool.so"
-          done
-          # FFmpeg has no MP3 encoder of its own, and MP3 320 is the app's
-          # headline format — a build without LAME is broken, not smaller.
-          grep -q libmp3lame "app/src/main/jniLibs/$ABI/libffmpeg.so" \
-            || { echo "FFmpeg for $ABI was built without libmp3lame"; exit 1; }
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: blueknight-native-${{ matrix.abi }}
-          path: android/app/src/main/jniLibs/${{ matrix.abi }}/*
-          if-no-files-found: error
-
-  android:
-    if: ${{ !startsWith(github.ref, 'refs/heads/refactor/') && !startsWith(github.head_ref, 'refactor/') }}
-    needs: [check, android-native]
-    strategy:
-      fail-fast: false
-      matrix:
-        target: [universal, arm64-v8a, armeabi-v7a, x86, x86_64]
-    runs-on: ubuntu-24.04
-    env:
-      # A step's `if` cannot read the secrets context, so the one thing that
-      # needs deciding — is there a keystore — is resolved once, here.
-      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      # Chaquopy needs a build-time interpreter matching the target version.
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.11" }
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: blueknight-native-arm64-v8a
-          path: android/app/src/main/jniLibs/arm64-v8a
-      - uses: actions/download-artifact@v4
-        with:
-          name: blueknight-native-armeabi-v7a
-          path: android/app/src/main/jniLibs/armeabi-v7a
-      - uses: actions/download-artifact@v4
-        with:
-          name: blueknight-native-x86
-          path: android/app/src/main/jniLibs/x86
-      - uses: actions/download-artifact@v4
-        with:
-          name: blueknight-native-x86_64
-          path: android/app/src/main/jniLibs/x86_64
-
-      # Signing is optional so that a fork, or a pull request from one, still
-      # produces an installable APK. Without the secrets the release build is
-      # signed with the debug key instead of failing.
-      - name: Write the signing configuration
-        if: env.HAS_KEYSTORE == 'true'
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        working-directory: android
-        run: |
-          echo "$KEYSTORE_BASE64" | base64 -d > release.keystore
-          {
-            echo "storeFile=release.keystore"
-            echo "storePassword=$STORE_PASSWORD"
-            echo "keyAlias=$KEY_ALIAS"
-            echo "keyPassword=$KEY_PASSWORD"
-          } > keystore.properties
-
-      - name: Require stable signing for a tagged release
-        if: (startsWith(github.ref, 'refs/tags/downloader-v') || startsWith(github.ref, 'refs/tags/Blueknightv')) && env.HAS_KEYSTORE != 'true'
-        working-directory: android
-        run: |
-          test -f ../keystore/whitebooster.jks || {
-            echo "Tagged Android releases require ANDROID_* secrets or the repository signer." >&2
-            exit 1
-          }
-
-      - uses: gradle/actions/setup-gradle@v4
-
-      - name: Make the Gradle wrapper executable
-        working-directory: android
-        run: chmod +x gradlew
-
-      - name: Lint and run Android unit tests
-        if: matrix.target == 'universal'
-        working-directory: android
-        run: ./gradlew lintRelease testReleaseUnitTest --no-daemon --stacktrace
-
-      - name: Assemble the ${{ matrix.target }} APK
-        working-directory: android
-        run: ./gradlew -PtargetAbi=${{ matrix.target }} assembleRelease --no-daemon --stacktrace
-
-      - name: Name and verify the APK
-        working-directory: android
-        run: |
-          mkdir -p out
-          cp app/build/outputs/apk/release/*.apk \
-             "out/BlueKnightDownloader-android-${{ matrix.target }}.apk"
-          python verify_apk.py \
-             "out/BlueKnightDownloader-android-${{ matrix.target }}.apk" \
-             "${{ matrix.target }}"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: blueknight-android-${{ matrix.target }}
-          path: android/out/*.apk
-          if-no-files-found: error
-
   release:
-    needs: [desktop, android]
+    needs: [desktop]
     if: (startsWith(github.ref, 'refs/tags/downloader-v') || startsWith(github.ref, 'refs/tags/Blueknightv'))
     runs-on: ubuntu-latest
     steps:
@@ -318,5 +140,4 @@ jobs:
           files: |
             artifacts/*.zip
             artifacts/*.tar.gz
-            artifacts/*.apk
           generate_release_notes: true
