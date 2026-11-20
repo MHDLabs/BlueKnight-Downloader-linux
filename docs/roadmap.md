@@ -59,22 +59,23 @@ have regression coverage.
 
 ## Phase 2 — Engine installation and lifecycle service
 
-**Status: Planned — next (wheel compatibility groundwork completed)**
+**Status: In progress — discovery and version probing extracted**
 
-The platform-specific Python wheel selector is already implemented in
+The platform-specific Python wheel selector lives in
 `blueknight/engines/wheels.py`. It matches PyPI wheel tags against the running
-interpreter and platform, and its tests cover Linux, Windows and universal
-wheels. This fixes the old Windows-only filter; it does not complete the
-manager extraction.
+interpreter and platform, with deterministic coverage for Linux, Windows and
+universal wheels.
 
-Next, extract tool discovery, native executable validation, version probing,
-download mirrors, checksums, installation, update staging and activation from
-`spotify_downloader.py` into a dedicated engine manager under
-`blueknight/engines/`.
+The first engine-manager slice is now implemented in
+`blueknight/engines/manager.py`. `EngineManager` owns native executable
+validation, the existing tool discovery order, version probing and versioned
+release URL selection. `SpotifyDownloader` retains compatibility adapters, so
+current UI and update call sites remain unchanged.
 
-Keep the existing UI-facing methods as thin adapters until callers migrate.
-Do not change the set of engines or their update sources without a separate,
-tested reason.
+Next, move network downloads, checksum verification, staged installation,
+update validation and activation behind the manager. Keep the existing UI-facing
+methods as thin adapters until callers migrate. Do not change the set of
+engines or their update sources without a separate, tested reason.
 
 **Exit criteria:** the manager has focused unit tests and the GUI still reports,
 installs, updates and launches the same tools as before.

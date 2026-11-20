@@ -46,6 +46,7 @@ CREATOR = "Blue Knight"
 TELEGRAM_URL = "https://t.me/BlueKnight_Net"
 
 from blueknight.engines.wheels import select_compatible_wheel
+from blueknight.engines.manager import EngineManager
 from blueknight.engines.catalog import (
     BGUTIL_DOWNLOAD_URLS, BGUTIL_PLUGIN_URL, DENO_ASSETS,
     DENO_DOWNLOAD_URLS, FFMPEG_DOWNLOADS, SPOTDL_ASSETS,
@@ -939,6 +940,11 @@ class SpotifyDownloader:
         self.ffmpeg_dir = self.app_data / "ffmpeg"
         self.ffmpeg_exe = self.ffmpeg_dir / "bin" / f"ffmpeg{EXE}"
         self.tools_dir = self.app_data / "tools"
+        self.engine_manager = EngineManager(
+            self.tools_dir, TOOLS, bundled_tool=bundled_tool,
+            module_version=pyshell.module_version, process_runner=pyshell.run,
+            is_windows=IS_WINDOWS, is_macos=IS_MACOS,
+            system_which=shutil.which)
         self.spotdl_exe = self.tools_dir / f"spotdl{EXE}"
 
         # Proxy settings with proper defaults for v2rayN
@@ -1440,55 +1446,19 @@ class SpotifyDownloader:
         pending.write_text(json.dumps(registry, indent=2), encoding="utf-8")
         os.replace(pending, ENGINE_UPDATE_REGISTRY)
 
-    @staticmethod
-    def _is_native_executable(path, minimum_size=1024 * 1024):
-        """True for a real program image for this machine, not an HTML error page.
-
-        A mirror that answers a download with a login page or a 404 body still
-        writes a file of plausible size, so the first bytes are checked against
-        the executable formats: PE on Windows, ELF on Linux, and
-        Mach-O — thin or universal, either byte order — on macOS.
-        """
-        magics = (b"MZ",) if IS_WINDOWS else (
-            (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe",
-             b"\xbe\xba\xfe\xca") if IS_MACOS else (b"\x7fELF",))
-        try:
-            path = Path(path)
-            with path.open("rb") as handle:
-                head = handle.read(4)
-            return (path.stat().st_size >= minimum_size
-                    and any(head.startswith(magic) for magic in magics))
-        except OSError:
-            return False
+    def _is_native_executable(self, path, minimum_size=1024 * 1024):
+        """Compatibility adapter for executable validation in EngineManager."""
+        return self.engine_manager.is_native_executable(path, minimum_size)
 
     def find_tool(self, name):
-        """Locate a tool, newest copy first.
-
-        A downloaded copy in app data only exists after an update, so it always
-        wins over the copy shipped inside the bundle.
-        """
-        spec = TOOLS[name]
-        downloaded = self.tools_dir / spec["exe"]
-        if self._is_native_executable(downloaded):
-            return str(downloaded)
-        packaged = bundled_tool(spec["exe"])
-        if packaged:
-            return packaged
-        found = shutil.which(name)
-        if found:
-            return found
-        if spec.get("module") and pyshell.module_version(name) != "unknown":
-            return name
-        return None
+        """Compatibility adapter for the engine discovery service."""
+        return self.engine_manager.find_tool(name)
 
     @staticmethod
     def tool_download_urls(name, version=None):
-        """Release URLs for a specific version, with independent mirrors."""
-        if name == "spotdl" and version:
-            return spotdl_urls(version.lstrip("vV"))
-        if name == "yt-dlp" and version:
-            return ytdlp_urls(version)
-        return TOOLS[name]["urls"]
+        """Compatibility adapter for catalog-backed release URL selection."""
+        return EngineManager.release_urls(
+            name, version, TOOLS, spotdl_urls, ytdlp_urls)
 
     def get_or_download_tool(self, name, force=False, version=None):
         """Return a usable tool path, downloading from the mirrors when needed."""
@@ -1549,24 +1519,8 @@ class SpotifyDownloader:
         return str(target)
 
     def tool_version(self, path):
-        try:
-            stem = Path(path).stem.lower()
-            if stem.startswith("lib") and stem[3:] in {"ffmpeg", "ffprobe"}:
-                stem = stem[3:]
-            version_flag = "-version" if stem in {"ffmpeg", "ffprobe"} else "--version"
-            result = pyshell.run([path, version_flag], timeout=45)
-            lines = result.stdout.strip().splitlines()
-            if result.returncode != 0 or not lines:
-                return "unknown"
-            if stem == "deno":
-                match = re.match(r"deno\s+([0-9][^\s]*)", lines[0])
-                return match.group(1) if match else lines[0].strip()
-            if stem in {"ffmpeg", "ffprobe"}:
-                match = re.match(r"ff(?:mpeg|probe) version\s+([^\s]+)", lines[0], re.I)
-                return match.group(1) if match else lines[0].strip()
-            return lines[-1].strip()
-        except Exception:
-            return "unknown"
+        """Compatibility adapter for engine version probing."""
+        return self.engine_manager.tool_version(path)
 
     def update_tools(self):
         """Refresh spotDL and yt-dlp from their mirrors, then report per tool."""

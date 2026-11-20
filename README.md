@@ -217,7 +217,7 @@ target Linux or Windows system.
 | --- | --- |
 | `spotify_downloader.py` | Desktop engine, download workflows and Python-to-WebView API |
 | `blueknight_paths.py` | Application paths, output folders and cookie discovery |
-| `blueknight/engines/` | Platform engine catalog and wheel compatibility helpers |
+| `blueknight/engines/` | Platform catalog, wheel compatibility and tool discovery/validation |
 | `blueknight/network/` | Proxy configuration and SOCKS5 bridge |
 | `web/` | Local HTML, CSS and ordered JavaScript interface assets |
 | `contracts/` | Versioned desktop bridge contract |
