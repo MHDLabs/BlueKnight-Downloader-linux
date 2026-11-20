@@ -65,7 +65,7 @@ The following are logical responsibilities, not completed modules yet:
 | Responsibility | Existing code examples |
 | --- | --- |
 | Application lifecycle and UI events | snapshot, begin, drain, ui, log, stop_download |
-| Network and proxy | configured_proxy, normalize_proxy_url, Socks5HttpBridge, test_proxy |
+| Network and proxy | blueknight/network/proxy.py now owns URL normalization, credential-safe display, process proxy environment and the SOCKS5 bridge; SpotifyDownloader still owns UI-facing proxy settings and connection tests |
 | Tool installation and updates | setup_dependencies, find_tool, get_or_download_tool, update_tools, component_summary |
 | Authentication and cookies | probe_cookie, usable_cookies, sign_in, finish_sign_in, refresh_session, cookie_status |
 | Spotify | start_download, download_with_spotdl, Spotify metadata and matching helpers |
@@ -74,6 +74,20 @@ The following are logical responsibilities, not completed modules yet:
 | Documents and manga | start_pdf_download, download_pdfs, download_manga, HTML/file validation |
 | Conversion | media_conversion_command, convert_media_file, convert_document_file, image-to-PDF helpers |
 | Desktop API | Api methods exposed to pywebview |
+
+## First extracted module
+
+The first network extraction is implemented:
+
+- `blueknight/network/proxy.py` contains the standalone proxy URL and SOCKS5
+  bridge helpers.
+- `spotify_downloader.py` re-exports those names so the current desktop engine
+  and older helper scripts retain their import surface.
+- `tests/test_network_proxy.py` covers URL validation, redaction, proxy
+  environment variables and a loopback SOCKS5 tunnel.
+- The UI-facing settings, reachability checks and proxy test workflow remain in
+  `SpotifyDownloader` for now; they are the next boundary to extract after the
+  isolated helper module is exercised in CI.
 
 ## Intended module boundaries
 
