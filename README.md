@@ -1,593 +1,253 @@
-<div align="center">
+# Blue Knight Downloader
 
-# ⚔️ Blue Knight Downloader
+A portable desktop downloader for Linux and Windows, built around a local
+WebView interface and a Python engine.
 
-### Portable desktop downloader for Spotify, YouTube, TikTok, and Instagram
+Linux is the primary development and CI target. Windows support and its
+packaging script are retained, but automated Windows builds and smoke tests
+are currently paused.
 
-**One executable. No installation. No complicated setup.**
-
-[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?logo=windows)](#system-requirements)
-[![Linux](https://img.shields.io/badge/Linux-64--bit-FCC624?logo=linux)](#system-requirements)
-[![Portable](https://img.shields.io/badge/Build-Portable-success)](#portable-usage)
-[![Version](https://img.shields.io/badge/Version-1.0-purple)](#whats-new-in-v1.0)
-
-</div>
-
----
-
-## Overview
-
-**Blue Knight Downloader** is a portable desktop application for Windows and Linux, built to download media from:
-
-- 🎵 Spotify
-- ▶️ YouTube
-- 🎬 TikTok
-- 📸 Instagram
-
-It includes the required tools, supports local proxies, manages authentication inside the application, and keeps downloads organized by platform.
-
-Python, `spotDL`, `yt-dlp`, and `FFmpeg` do not need to be installed separately.
+[Releases](https://github.com/MHDLabs/BlueKnight-Downloader-linux/releases) ·
+[Issues](https://github.com/MHDLabs/BlueKnight-Downloader-linux/issues) ·
+[Development guide](DEVELOPING.md) ·
+[Architecture](docs/architecture.md)
 
 ---
 
-## Features
+## What it supports
 
-### Multi-platform downloads
+| Workspace | Supported content |
+| --- | --- |
+| Spotify | Tracks, albums and playlists |
+| YouTube | Videos, Shorts, playlists and audio |
+| YouTube Music | Songs, albums and playlists |
+| TikTok | Videos, supported posts, profiles and hashtag pages |
+| Instagram | Reels, posts, profiles and supported media |
+| SoundCloud | Tracks, sets and profiles, including account-entitled streams |
+| X | Videos, photos, GIFs and multi-image posts |
+| Video | Public video pages and direct media links supported by the available extractors |
+| Documents & Ebooks | PDF, EPUB, MOBI, AZW/AZW3, FB2, Office, OpenDocument, DjVu, CHM, RTF, text and CBZ |
+| Manga / manhwa | Public or account-authorized chapter pages, saved as PDF or CBZ |
 
-Download supported content from four major platforms:
+Availability depends on the source, account permissions, region and changes made
+by third-party services. The app does not bypass DRM, subscriptions, paywalls or
+access controls.
 
-| Platform | Supported content |
-|---|---|
-| Spotify | Tracks, albums, and playlists |
-| YouTube | Videos, audio, playlists, and supported links |
-| TikTok | Videos and supported posts |
-| Instagram | Reels, posts, profiles, and supported media |
+## Download engines
 
-### Portable desktop packages
+Blue Knight keeps multiple engines because no single extractor handles every
+kind of media:
 
-- No traditional installation or separate Python setup is required.
-- Windows releases are distributed as a portable ZIP archive.
-- Linux releases are distributed as a portable TAR.GZ archive.
-- Extract the package and keep its bundled files together.
-- The Linux desktop window uses the system WebKitGTK 4.1 runtime; the archive does not bundle a complete browser engine.
+- **yt-dlp** handles video and audio on supported sites.
+- **spotDL** resolves Spotify metadata and matches available audio.
+- **NewPipeExtractor** is a desktop JVM fallback for supported sources such as
+  YouTube, YouTube Music and SoundCloud.
+- **Streamlink** handles supported live and HLS streams.
+- **gallery-dl** resolves photos, GIFs, galleries and mixed posts.
+- **Deno** runs yt-dlp's JavaScript challenge components.
+- **FFmpeg** handles media conversion and audio/video processing.
+- **YoutubeExplode** is retained as an additional YouTube helper.
+- Built-in document and image resolvers cover supported files and pages.
 
-### Built-in authentication
+Fallbacks are selected according to the kind of failure. A DRM or permission
+failure is not treated as a reason to try to bypass the restriction.
 
-Sign in directly inside the application when a platform requires authentication.
+## Main features
 
-- No browser extension required
-- No manual cookie-file export
-- Authentication data is stored separately for each platform
-- Sessions can be refreshed automatically when supported
-- Credentials and sessions from different platforms are not mixed
+### Downloads and fallback handling
 
-### Improved YouTube compatibility
+The application preserves source-specific download workflows, progress
+reporting, item limits for supported collections, and separate output folders.
+It can refresh expired YouTube media URLs and retry supported extractor clients
+before reporting that sign-in or another action is required.
 
-Blue Knight includes additional handling for YouTube restrictions such as:
+### Sign-in and cookies
 
-```text
-Sign in to confirm you're not a bot
-```
+Sign-in is available inside the app for supported services. The application
+keeps cookie sessions separated by site and checks that exported cookie files
+belong to the requested domain before using them. It can also read supported
+browser profiles when the browser's cookie database is accessible.
 
-The application can automatically switch between available request methods and authentication modes when necessary.
-
-Some restricted, private, age-limited, or region-limited content may still require a valid account.
-
-### Organized download folders
-
-Downloads are stored inside:
-
-```text
-BlueKnightDownloader/
-```
-
-Each platform receives its own folder:
-
-```text
-BlueKnightDownloader/
-├── Spotify/
-├── YouTube/
-├── TikTok/
-└── Instagram/
-```
-
-This keeps downloaded audio, video, playlists, and related files separated and easy to find.
-
-### Accurate download information
-
-The interface displays real download information, including:
-
-- Current progress
-- Download speed
-- Estimated remaining time
-- Completed file count
-- Failed file count
-- Current file or item
-- Final completion status
-
-A download is only marked as completed after the expected output file has been created successfully.
-
-### Dynamic interface
-
-The interface includes:
-
-- Light mode
-- Dark mode
-- Glass-style visual effects
-- Platform-specific colors
-- Dynamic backgrounds
-- Separate workspaces for each supported service
-
-Selecting a platform changes the appearance of the application to match that service.
-
-### Bundled tools
-
-The portable package includes:
-
-- `yt-dlp`
-- `spotDL`
-- `FFmpeg`
-
-Bundled tools are reused on every launch and are not downloaded again unnecessarily.
-
-The application can also update or restore required tools automatically when supported.
-
-### Fallback tool downloads
-
-When a required tool is missing from a custom build, Blue Knight can cache it under:
-
-```text
-%LOCALAPPDATA%\BlueKnightDownloader
-```
-
-Independent fallback sources may be used:
-
-| Tool | Fallback sources |
-|---|---|
-| spotDL | GitHub and SourceForge |
-| yt-dlp | Official GitHub releases |
-| FFmpeg | BtbN and gyan.dev |
-
-Internet access is still required to resolve metadata and download online media.
+Cookie files and active sessions are sensitive. Do not share an application
+folder that contains a signed-in session.
 
 ### Proxy support
 
-Blue Knight supports local HTTP and SOCKS5 proxies.
+HTTP and SOCKS5 proxies are supported, including common local clients such as
+v2rayN and Clash. The app includes proxy presets, manual configuration and a
+connection test. A local bridge allows HTTP-only tools such as spotDL to use a
+SOCKS5 connection.
 
-Compatible configurations include:
+### Conversion
 
-- v2rayN
-- Clash
-- Clash Verge
-- Other HTTP proxy clients
-- Other SOCKS5 proxy clients
+The local converter supports common audio and video formats including MP3,
+FLAC, WAV, M4A, OGG, AAC, MP4, MKV, WebM, MOV and AVI. FFmpeg performs the
+transcode.
 
-The application includes:
-
-- Proxy presets
-- Manual proxy configuration
-- HTTP proxy support
-- SOCKS5 proxy support
-- Built-in proxy testing
-- Per-download proxy usage
-
-Common v2rayN defaults:
-
-```text
-HTTP:   127.0.0.1:10809
-SOCKS5: 127.0.0.1:10808
-```
-
-Your actual ports may differ depending on your proxy client configuration.
-
----
-
-## What's New in v6.1
-
-### Instagram support
-
-Instagram now has a dedicated download workspace with support for:
-
-- Reels
-- Posts
-- Profile links
-- Supported media URLs
-- Instagram-inspired interface colors
-
-### Better YouTube restriction handling
-
-The YouTube downloader can use alternative request configurations when YouTube displays bot-verification or sign-in restrictions.
-
-### In-app sign-in
-
-Users can authenticate directly inside Blue Knight without manually exporting browser cookies.
-
-### Separate session storage
-
-Each platform keeps its own authentication session and storage area.
-
-### Improved file organization
-
-Downloads from Spotify, YouTube, TikTok, and Instagram are automatically stored in separate folders.
-
-### Improved progress reporting
-
-Progress, file counts, speed, and estimated remaining time now reflect actual downloader activity more accurately.
-
-### Updated interface
-
-The application now includes redesigned platform pages, dynamic colors, light mode, dark mode, and improved visual feedback.
+The document tools can create PDFs from images, build CBZ archives and handle
+supported document conversions. LibreOffice and Calibre are detected when
+installed for workflows that need them.
 
 ---
 
 ## Installation
 
-No traditional installer is required.
+### Linux
 
-**Windows**
+1. Open the repository's [Releases](https://github.com/MHDLabs/BlueKnight-Downloader-linux/releases).
+2. Download the Linux x64 TAR.GZ package.
+3. Extract the complete archive into a writable directory.
+4. Make sure WebKitGTK 4.1 and the required GTK runtime libraries are installed.
+5. Run the BlueKnightDownloader executable from the extracted directory.
 
-1. Download the Windows ZIP from the Releases page.
-2. Extract the entire archive.
-3. Run `BlueKnightDownloader.exe`.
+The Linux package does not bundle a complete WebKitGTK browser runtime.
+WebKitGTK 4.1 must be provided by the host distribution.
 
-**Linux**
+Package dependencies on common distributions:
 
-1. Download the Linux TAR.GZ package from the Releases page.
-2. Extract the archive.
-3. Make sure WebKitGTK 4.1 and the required GTK runtime libraries are installed.
-4. Run `./BlueKnightDownloader` from the extracted folder.
+- Arch Linux: `sudo pacman -S webkit2gtk-4.1 gtk3`
+- Debian/Ubuntu: install the WebKitGTK 4.1 runtime and GTK libraries from the distribution repositories.
+- Fedora: install the WebKitGTK 4.1 and GTK runtime packages from the distribution repositories.
 
-> [!IMPORTANT]
-> Do not run the program from inside the compressed archive. On Linux, the
-> WebKitGTK runtime is provided by the host distribution and is not bundled
-> into the portable archive.
+Package names may vary by distribution release.
 
-## Basic Usage
+### Windows
 
-1. Open `BlueKnightDownloader.exe`.
-2. Select Spotify, YouTube, TikTok, or Instagram.
-3. Paste a supported URL.
-4. Choose the preferred format or download options.
-5. Configure a proxy when required.
-6. Start the download.
-7. Open the output folder when the download finishes.
+The Windows build script is retained at `build_portable.ps1`, but its automated
+CI build and smoke test are paused. Windows packaging should therefore be
+treated as requiring manual verification until Windows CI is restored.
 
 ---
 
-## Spotify Usage
+## Portable data and file locations
 
-Paste a Spotify URL for a:
+Official desktop archives include a `portable.mode` marker beside the
+executable. While it is present:
 
-- Track
-- Album
-- Playlist
+- Updateable tools and application-managed runtime data are stored under
+  `data/SpotifyDownloader/` beside the application.
+- Downloads are stored in the `BlueKnightdownloader/` folder beside the app,
+  separated by source.
+- Cookie sessions and exported cookie files use their own app-side locations.
 
-Spotify metadata is resolved through `spotDL`.
+Keep the marker beside the executable and extract the archive into a writable
+folder. A writable USB drive can be used. Removing the marker changes future
+application data to the normal per-user location; it does not delete the
+existing `data/` directory.
 
-Depending on availability, audio may be matched using supported external audio providers.
-
----
-
-## YouTube Usage
-
-Paste a supported YouTube URL for a:
-
-- Video
-- Playlist
-- Music video
-- Audio download
-- Supported channel or collection link
-
-Available formats depend on the selected download mode and the media formats reported by YouTube.
+The optional `BLUEKNIGHT_DATA` environment variable overrides the application
+data location.
 
 ---
 
-## TikTok Usage
+## System requirements
 
-Paste a supported TikTok video or post URL.
+### Linux
 
-Availability may depend on:
+- 64-bit Linux with a compatible glibc runtime.
+- WebKitGTK 4.1 and the required GTK runtime libraries.
+- A writable application directory when using portable mode.
+- Internet access for metadata, updates and online downloads.
 
-- Region
-- Content visibility
-- Login requirements
-- TikTok platform changes
+### Windows
 
----
+- Windows 10 or Windows 11, 64-bit.
+- Microsoft Edge WebView2 Runtime for embedded web content and sign-in.
+- A writable application directory when using portable mode.
+- Internet access for metadata, updates and online downloads.
 
-## Instagram Usage
-
-Paste a supported Instagram URL for a:
-
-- Reel
-- Post
-- Profile
-- Supported media page
-
-Private content requires an account that already has permission to view it.
+Some conversion features use optional system applications such as LibreOffice
+or Calibre. They are detected when installed; they are not silently substituted
+with a DRM or access-control bypass.
 
 ---
 
-## Signing In
+## Building from source
 
-When authentication is required:
+The repository contains the desktop engine, UI assets, helper projects and
+packaging scripts.
 
-1. Select the target platform.
-2. Open the sign-in option inside the application.
-3. Complete the sign-in process.
-4. Close the authentication window when finished.
-5. Retry the download.
+Linux:
 
-Authentication data is stored separately for each service.
+~~~bash
+python3 -m pip install -r requirements.txt
+bash ./build_portable.sh
+~~~
 
-Do not share the application data folder if it contains an active login session.
+Windows:
 
----
+~~~powershell
+python -m pip install -r requirements.txt
+.\build_portable.ps1
+~~~
 
-## Proxy Configuration
+The Linux build requires WebKitGTK 4.1 development libraries. The NewPipe and
+YoutubeExplode helpers use Java 17 and .NET 8 respectively; install those SDKs
+when building a package that should include both helpers.
 
-To configure a proxy:
+The build scripts place distributable packages under `release/`. CI currently
+builds and smoke-tests Linux x64. The Windows packaging script remains
+available, but its CI job is paused.
 
-1. Open **Advanced Settings**.
-2. Select **HTTP** or **SOCKS5**.
-3. Enter the proxy host and port.
-4. Select **Test Proxy**.
-5. Start the download after a successful test.
+### Tests
 
-Examples:
+Run the deterministic Python tests:
 
-```text
-HTTP://127.0.0.1:10809
-SOCKS5://127.0.0.1:10808
-```
+~~~bash
+python -m pip install "packaging>=24"
+python -m unittest discover -s tests -p "test_*.py" -v
+~~~
 
-Use the proxy address shown inside your proxy client.
+Run the WebView and bridge checks:
 
----
+~~~bash
+python tests/check_web_assets.py
+node tests/check_web_scripts.mjs
+python tests/check_bridge_contract.py
+~~~
 
-## Portable Usage
-
-The Windows ZIP and Linux TAR.GZ are no-installer packages. Extract the archive
-and keep the executable and its bundled application files together.
-
-The extracted directory can be moved to another folder, disk or USB drive, as
-long as the destination is writable and the required system libraries are
-available. Linux requires WebKitGTK 4.1 at runtime.
-
-Every official Windows and Linux archive includes a portable.mode marker
-beside the executable. While that marker is present, updateable tools, plugins
-and application-managed runtime data are stored under data/SpotifyDownloader/
-inside the extracted package. Downloads and exported authentication cookies
-remain in their own folders beside the executable.
-
-Keep portable.mode beside the executable and extract the package to a writable
-folder. A USB drive works when it is writable. Removing the marker returns
-future application data to the normal per-user location; it does not delete
-the existing data/ folder.
+These checks do not replace a visual test of the actual desktop window on the
+target Linux or Windows system.
 
 ---
 
-## System Requirements
+## Repository layout
 
-**Windows**
-- Windows 10 or Windows 11, 64-bit
-- Microsoft Edge WebView2 Runtime for in-app authentication
-- Internet connection and sufficient free storage
+| Path | Purpose |
+| --- | --- |
+| `spotify_downloader.py` | Desktop engine, download workflows and Python-to-WebView API |
+| `blueknight_paths.py` | Application paths, output folders and cookie discovery |
+| `blueknight/engines/` | Platform engine catalog and wheel compatibility helpers |
+| `blueknight/network/` | Proxy configuration and SOCKS5 bridge |
+| `web/` | Local HTML, CSS and ordered JavaScript interface assets |
+| `contracts/` | Versioned desktop bridge contract |
+| `tests/` | Deterministic regression and frontend checks |
+| `jvm/` | NewPipe desktop helper |
+| `dotnet/` | YoutubeExplode desktop helper |
 
-**Linux**
-- 64-bit Linux distribution with a compatible glibc runtime
-- WebKitGTK 4.1 and GTK runtime libraries
-- Internet connection and sufficient free storage
+For implementation details and module boundaries, see
+[DEVELOPING.md](DEVELOPING.md) and [docs/architecture.md](docs/architecture.md).
 
-Recommended on either platform:
-- At least 4 GB of RAM
-- A modern multi-core processor
-- Stable internet connection
+## Third-party components
 
----
-
-## Package Structure
-
-A typical release package may look like this:
-
-```text
-BlueKnightDownloader/
-├── BlueKnightDownloader.exe
-├── portable.mode
-├── data/                 # created on first run for updateable app data
-├── tools/
-│   ├── ffmpeg/
-│   ├── spotdl/
-│   └── yt-dlp/
-├── source/
-├── downloads/
-├── THIRD_PARTY_NOTICES.txt
-├── LICENSE
-└── README.md
-```
-
-The exact folder structure may vary between releases.
-
----
-
-## Source Code
-
-The original Python source code and proxy tests are included in:
-
-```text
-source/
-```
-
-Custom builds should preserve the required application assets and tool paths.
-
----
-
-## Third-Party Components
-
-Blue Knight Downloader uses third-party open-source tools, including:
-
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-- [spotDL](https://github.com/spotDL/spotify-downloader)
-- [FFmpeg](https://ffmpeg.org/)
-
-Third-party licenses, notices, and source links are available in:
-
-```text
-THIRD_PARTY_NOTICES.txt
-```
+This project uses third-party software including yt-dlp, spotDL, FFmpeg, Deno,
+gallery-dl, Streamlink, NewPipeExtractor, YoutubeExplode and Python libraries.
+Their respective licenses and source links are listed in
+[THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
 
 ## License
 
-Blue Knight Downloader source code is licensed under the **GNU General Public License v3.0 only**. See [LICENSE](LICENSE). Third-party components retain their respective licenses; see [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
+The Blue Knight Downloader project is licensed under
+**GNU GPL-3.0-only**. See [LICENSE](LICENSE). Third-party components retain
+their own licenses.
 
-Blue Knight Downloader is not affiliated with Spotify, YouTube, Google, TikTok, ByteDance, Instagram, or Meta.
-
----
-
-## Troubleshooting
-
-### The application does not open
-
-Confirm that:
-
-- The ZIP archive was fully extracted
-- The executable is not running from inside the ZIP
-- All included files remain in the application folder
-- Windows Defender or another antivirus did not remove a required file
-- The application has permission to write to its folder
-
-### A download fails immediately
-
-Check that:
-
-- The URL is valid
-- The content is publicly accessible
-- Your internet connection is working
-- Your proxy configuration is correct
-- The selected platform is available in your region
-- The required authentication session is active
-
-### YouTube requests account verification
-
-Open the YouTube sign-in window inside Blue Knight and authenticate with an account that can access the requested content.
-
-Some YouTube restrictions are controlled by YouTube and cannot always be bypassed without authentication.
-
-### Instagram content cannot be downloaded
-
-Confirm that:
-
-- The link opens normally in a browser
-- The post or profile is not private
-- Your account has access to private content
-- Your Instagram session has not expired
-
-### Spotify metadata loads but audio fails
-
-Spotify is used primarily for metadata resolution.
-
-Audio matching and availability depend on the providers supported by `spotDL`, regional availability, and the accuracy of the track match.
-
-### Proxy test fails
-
-Confirm that:
-
-- Your proxy client is running
-- The selected proxy type is correct
-- The host and port match the proxy client
-- LAN or local connection access is enabled when required
-- Another application is not blocking the local port
-
-### A required tool is missing
-
-Restart Blue Knight while connected to the internet.
-
-The application will attempt to restore or cache the missing component using an available fallback source.
-
----
-
-## Antivirus Notice
-
-Portable applications that bundle download tools, Python components, network features, or process launchers may occasionally trigger false-positive antivirus detections.
-
-Before running the application:
-
-- Download it only from the official repository
-- Verify the release checksum when provided
-- Review the included source code
-- Scan the release using your preferred security tools
-
-Never disable antivirus protection permanently.
-
----
-
-## Privacy
-
-Blue Knight Downloader processes URLs and download operations locally whenever possible.
-
-Authentication sessions may be stored locally so that users do not need to sign in repeatedly.
-
-Users should:
-
-- Protect their application data folder
-- Avoid sharing active session files
-- Sign out before giving the application folder to another person
-- Remove cached sessions from shared computers
-
----
-
-## Legal Notice
-
-Blue Knight Downloader is intended for downloading content that you own, content that is publicly available, or content that you have permission to download.
-
-Users are responsible for complying with:
-
-- Copyright laws
-- Platform terms of service
-- Content licensing requirements
-- Local regulations
-
-The developers are not responsible for misuse of the application.
-
----
-
-## Downloads
-
-Download the latest release from the repository's **Releases** section:
-
-```text
-https://github.com/BlueKnightNet/BlueKnight-Downloader-/releases
-```
-
-Replace `USERNAME/REPOSITORY` with the correct GitHub repository path.
-
----
+Download only content that you own or have permission to download. Follow the
+laws and platform terms that apply to you.
 
 ## Community
 
-Telegram:
+Telegram: [@BlueKnight_Net](https://t.me/BlueKnight_Net)
 
-```text
-@BlueKnight_Net
-```
-
-Use the repository Issues section to report:
-
-- Bugs
-- Failed downloads
-- Interface problems
-- Proxy issues
-- Platform compatibility changes
-- Feature requests
-
-When reporting a problem, include the application version, platform, error message, and relevant log output.
-
----
-
-<div align="center">
-
-### ⚔️ The gates were locked. They are not locked anymore.
-
-**Blue Knight Downloader v6.1**
-
-</div>
+Report bugs and request features through the repository
+[Issues](https://github.com/MHDLabs/BlueKnight-Downloader-linux/issues) page.
+Include your operating system, app version, source and relevant error output.
