@@ -386,12 +386,68 @@ SITE_SESSION_COOKIES = {
 REGISTRY_NAME = "registry.json"
 
 
+def write_netscape_jar(cookies, path):
+    """Atomically save browser cookies with owner-only permissions on POSIX."""
+    path = Path(path)
+    lines = ["# Netscape HTTP Cookie File",
+             "# Written by Blue Knight Downloader. Editing this is not needed.", ""]
+    written = 0
+    for cookie in cookies:
+        for name, morsel in cookie.items():
+            domain = morsel["domain"] or ""
+            if not domain:
+                continue
+            expires = morsel["expires"]
+            if expires:
+                with contextlib.suppress(Exception):
+                    expires = int(time.mktime(
+                        time.strptime(expires, "%a, %d %b %Y %H:%M:%S %Z")))
+            lines.append("\t".join([
+                domain,
+                "TRUE" if domain.startswith(".") else "FALSE",
+                morsel["path"] or "/",
+                "TRUE" if morsel["secure"] else "FALSE",
+                str(expires or int(time.time()) + 60 * 60 * 24 * 180),
+                name,
+                morsel.value,
+            ]))
+            written += 1
+
+    # Create beside the destination so os.replace stays on one filesystem.
+    # mkstemp starts with owner-only permissions on POSIX; keep that mode when
+    # the completed jar replaces an older, potentially over-permissive file.
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            if not IS_WINDOWS:
+                os.fchmod(stream.fileno(), 0o600)
+            stream.write("\n".join(lines) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        if not IS_WINDOWS:
+            path.chmod(0o600)
+    finally:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+    return written
+
+
 def cookie_dir(site=None):
-    """Where the app keeps the jars it writes. One folder per site."""
-    folder = app_dir() / COOKIE_DIR_NAME
-    if site:
-        folder = folder / site
-    folder.mkdir(parents=True, exist_ok=True)
+    """Where the app keeps private cookie jars. One folder per site."""
+    root = app_dir() / COOKIE_DIR_NAME
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if not IS_WINDOWS:
+        root.chmod(0o700)
+
+    if not site:
+        return root
+
+    folder = root / site
+    folder.mkdir(mode=0o700, exist_ok=True)
+    if not IS_WINDOWS:
+        folder.chmod(0o700)
     return folder
 
 

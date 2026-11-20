@@ -32,7 +32,8 @@ from blueknight_paths import (
     ARCH, COOKIE_FAILURE, EXE, IS_LINUX, IS_MACOS, IS_WINDOWS, OS_TAG,
     SITE_SESSION_COOKIES, SOURCES, app_data_dir, candidate_label, cookie_candidates,
     cookie_dir, download_dir, download_root, host_matches, jar_line_matches_domain,
-    locked_by_browser, read_registry, record_jar, registry_entry, ytdlp_cookie_args)
+    locked_by_browser, read_registry, record_jar, registry_entry, write_netscape_jar,
+    ytdlp_cookie_args)
 from blueknight.media.validation import (
     COOKIE_DOMAINS, MEDIA_EXTENSIONS, MEDIA_LABELS, MEDIA_PATTERNS,
     PDF_MAGIC, YOUTUBE_DOMAINS, HtmlImageParser, HtmlMediaParser,
@@ -406,36 +407,7 @@ def validate_engine_update(paths):
         if stream_name != "hls":
             raise RuntimeError("Streamlink plugin loading failed")
         return True
-    except Exception:
-        return False
-
-
-def write_netscape_jar(cookies, path):
-    """Save browser cookies as the Netscape file yt-dlp reads. Returns the count."""
-    lines = ["# Netscape HTTP Cookie File",
-             "# Written by Blue Knight Downloader. Editing this is not needed.", ""]
-    written = 0
-    for cookie in cookies:
-        for name, morsel in cookie.items():
-            domain = morsel["domain"] or ""
-            if not domain:
-                continue
-            expires = morsel["expires"]
-            if expires:
-                with contextlib.suppress(Exception):
-                    expires = int(time.mktime(
-                        time.strptime(expires, "%a, %d %b %Y %H:%M:%S %Z")))
-            lines.append("\t".join([
-                domain,
-                "TRUE" if domain.startswith(".") else "FALSE",
-                morsel["path"] or "/",
-                "TRUE" if morsel["secure"] else "FALSE",
-                str(expires or int(time.time()) + 60 * 60 * 24 * 180),
-                name,
-                morsel.value,
-            ]))
-            written += 1
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except Exception:")
     return written
 
 

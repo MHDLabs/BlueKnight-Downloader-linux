@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 import tempfile
 import unittest
 from pathlib import Path
@@ -179,6 +180,44 @@ class PortableDataMigrationTests(unittest.TestCase):
         result = blueknight_paths.app_data_dir("EmptyDownloader")
         self.assertEqual(result, self.portable_root("EmptyDownloader"))
         self.assertFalse(result.exists())
+
+    def test_cookie_directories_are_owner_only_on_posix(self):
+        site_dir = blueknight_paths.cookie_dir("youtube")
+        root_dir = self.home / blueknight_paths.COOKIE_DIR_NAME
+        self.assertEqual(stat.S_IMODE(root_dir.stat().st_mode), 0o700)
+        self.assertEqual(stat.S_IMODE(site_dir.stat().st_mode), 0o700)
+
+    def test_cookie_jar_is_atomic_and_owner_only_on_posix(self):
+        from http.cookies import SimpleCookie
+
+        destination = self.root / "cookies.txt"
+        cookies = SimpleCookie()
+        cookies["sessionid"] = "private-session-value"
+        cookies["sessionid"]["domain"] = ".instagram.com"
+        cookies["sessionid"]["path"] = "/"
+        cookies["sessionid"]["secure"] = True
+
+        self.assertEqual(blueknight_paths.write_netscape_jar([cookies], destination), 1)
+        self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+        content = destination.read_text(encoding="utf-8")
+        self.assertIn(".instagram.com\tTRUE\t/\tTRUE\t", content)
+        self.assertTrue(content.rstrip().endswith("sessionid\tprivate-session-value"))
+
+    def test_failed_cookie_jar_replace_preserves_previous_file_and_cleans_temp(self):
+        from http.cookies import SimpleCookie
+
+        destination = self.root / "cookies.txt"
+        destination.write_text("previous-session", encoding="utf-8")
+        cookies = SimpleCookie()
+        cookies["sessionid"] = "new-session"
+        cookies["sessionid"]["domain"] = ".instagram.com"
+
+        with patch("blueknight_paths.os.replace", side_effect=OSError("replace failed")):
+            with self.assertRaisesRegex(OSError, "replace failed"):
+                blueknight_paths.write_netscape_jar([cookies], destination)
+
+        self.assertEqual(destination.read_text(encoding="utf-8"), "previous-session")
+        self.assertEqual(list(self.root.glob(".cookies.txt.*.tmp")), [])
 
 
 if __name__ == "__main__":
