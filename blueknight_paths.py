@@ -118,14 +118,20 @@ def app_dir():
 
 
 def app_data_dir(name="SpotifyDownloader"):
-    """Per-user writable state: downloaded tools, FFmpeg, the browser profile.
+    """Writable application state, with an opt-in portable package mode.
 
-    Kept apart from app_dir() because a portable app folder can sit on a
-    read-only volume, and because each desktop has its own convention for it.
+    Official desktop archives include a portable.mode marker beside the
+    executable. In that mode, updateable tools and application-managed data
+    live below data/ next to the program. Without the marker, the normal
+    per-user platform data directory is used. BLUEKNIGHT_DATA always takes
+    precedence. The portable directory must be writable.
     """
     override = os.environ.get("BLUEKNIGHT_DATA")
     if override:
         return Path(override)
+    home = app_dir()
+    if (home / "portable.mode").is_file():
+        return home / "data" / name
     if IS_WINDOWS:
         base = Path(os.environ.get("LOCALAPPDATA")
                     or Path.home() / "AppData" / "Local")
@@ -468,6 +474,28 @@ if __name__ == "__main__":
         assert got["instagram"].parent == Path(tmp), got["instagram"]
     assert download_root().name == ROOT_NAME
     assert download_root().parent == app_dir()
+
+    # Release archives opt into portable data next to the executable.
+    _old_home = os.environ.get("BLUEKNIGHT_HOME")
+    _old_data = os.environ.get("BLUEKNIGHT_DATA")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["BLUEKNIGHT_HOME"] = tmp
+            os.environ.pop("BLUEKNIGHT_DATA", None)
+            (Path(tmp) / "portable.mode").touch()
+            assert app_data_dir() == Path(tmp) / "data" / "SpotifyDownloader"
+            override = Path(tmp) / "custom-data"
+            os.environ["BLUEKNIGHT_DATA"] = str(override)
+            assert app_data_dir() == override
+    finally:
+        if _old_home is None:
+            os.environ.pop("BLUEKNIGHT_HOME", None)
+        else:
+            os.environ["BLUEKNIGHT_HOME"] = _old_home
+        if _old_data is None:
+            os.environ.pop("BLUEKNIGHT_DATA", None)
+        else:
+            os.environ["BLUEKNIGHT_DATA"] = _old_data
 
     # Whatever the machine has, the two renderings must agree — and a browser must
     # never be handed to cookiefile.

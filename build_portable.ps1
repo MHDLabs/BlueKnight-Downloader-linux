@@ -176,9 +176,12 @@ Copy-Item (Join-Path $Root "THIRD_PARTY_NOTICES.txt") $Dist -Force
 Copy-Item (Join-Path $Root "GPL-3.0.txt") $Dist -Force
 
 $Executable = Join-Path $Dist "BlueKnightDownloader.exe"
+$PortableMarker = Join-Path $Dist "portable.mode"
+New-Item -Path $PortableMarker -ItemType File -Force | Out-Null
 $Package = Join-Path $Dist "BlueKnightDownloader-windows-x64.zip"
 $PackageItems = @(
     $Executable,
+    $PortableMarker,
     (Join-Path $Dist "README.md"),
     (Join-Path $Dist "THIRD_PARTY_NOTICES.txt"),
     (Join-Path $Dist "GPL-3.0.txt")

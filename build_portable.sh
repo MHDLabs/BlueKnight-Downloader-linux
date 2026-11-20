@@ -206,7 +206,8 @@ if [ "$OS_TAG" = mac ]; then
     echo "Application bundle created at $OUTPUT/BlueKnightDownloader.app"
 else
     PACKAGE="BlueKnightDownloader-linux-${ARCH}.tar.gz"
-    tar -czf "$PACKAGE" BlueKnightDownloader README.md THIRD_PARTY_NOTICES.txt GPL-3.0.txt
+    : > portable.mode
+    tar -czf "$PACKAGE" BlueKnightDownloader portable.mode README.md THIRD_PARTY_NOTICES.txt GPL-3.0.txt
     echo "Standalone executable created at $OUTPUT/BlueKnightDownloader"
 fi
 echo "Release package created at $OUTPUT/$PACKAGE"

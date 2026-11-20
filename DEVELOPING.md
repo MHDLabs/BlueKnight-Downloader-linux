@@ -24,8 +24,8 @@ Python updates on restart.
 2. Run `BlueKnightDownloader.exe` on Windows or `./BlueKnightDownloader` on Linux.
 3. Pick a source in the sidebar, paste a link, press **Download**.
 
-Built for 64-bit Windows 10 and 11. Internet access is still needed to resolve
-metadata and fetch media.
+Built for 64-bit Linux and Windows 10/11. Internet access is still needed to
+resolve metadata and fetch media.
 
 ## What each source takes
 
@@ -247,7 +247,7 @@ engines current is important.
 **Windows**
 
 ```powershell
-.uild_portable.ps1
+.\build_portable.ps1
 ```
 
 **Linux**
@@ -264,8 +264,10 @@ command-line tools and create a portable package under `release/`:
 
 The Linux build needs the WebKitGTK 4.1 and GTK development packages. The
 resulting Linux archive does not bundle WebKitGTK; the matching runtime
-libraries must be installed on the target system. A JDK 17 and .NET 8 SDK are
-used to build the NewPipe and YoutubeExplode fallback helpers when available.
+libraries must be installed on the target system. Both release archives include
+portable.mode, which stores updateable tools and application-managed data under
+a data/ directory beside the executable. A JDK 17 and .NET 8 SDK are used to
+build the NewPipe and YoutubeExplode fallback helpers when available.
 
 CI validates Windows x64 and Linux x64 builds. Tags named
 `downloader-v*` or `Blueknightv*` publish the desktop ZIP and TAR.GZ artifacts.

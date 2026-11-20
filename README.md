@@ -354,10 +354,16 @@ The extracted directory can be moved to another folder, disk or USB drive, as
 long as the destination is writable and the required system libraries are
 available. Linux requires WebKitGTK 4.1 at runtime.
 
-"Portable" describes the application package, not a promise that every piece of
-user data stays inside that directory. Downloads and exported authentication
-cookies are stored alongside the application; updateable components and other
-writable application data may use the operating system's per-user data directory.
+Every official Windows and Linux archive includes a portable.mode marker
+beside the executable. While that marker is present, updateable tools, plugins
+and application-managed runtime data are stored under data/SpotifyDownloader/
+inside the extracted package. Downloads and exported authentication cookies
+remain in their own folders beside the executable.
+
+Keep portable.mode beside the executable and extract the package to a writable
+folder. A USB drive works when it is writable. Removing the marker returns
+future application data to the normal per-user location; it does not delete
+the existing data/ folder.
 
 ---
 
@@ -387,6 +393,8 @@ A typical release package may look like this:
 ```text
 BlueKnightDownloader/
 ├── BlueKnightDownloader.exe
+├── portable.mode
+├── data/                 # created on first run for updateable app data
 ├── tools/
 │   ├── ffmpeg/
 │   ├── spotdl/
