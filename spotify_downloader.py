@@ -22,12 +22,8 @@ import zipfile
 import ssl
 import urllib.request
 import urllib.error
-import socket
-import socketserver
-import select
 import tarfile
 import tempfile
-import ipaddress
 import io
 from html.parser import HTMLParser
 from urllib.parse import quote, unquote, urljoin, urlsplit
