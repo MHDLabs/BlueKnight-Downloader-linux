@@ -89,6 +89,13 @@ The first network extraction is implemented:
   `SpotifyDownloader` for now; they are the next boundary to extract after the
   isolated helper module is exercised in CI.
 
+
+The UI-facing proxy controller has now been moved behind `ProxyManager` in
+`blueknight/network/proxy.py`. It receives settings and UI callbacks from the
+application, owns connection checks and urllib opener lifetimes, and leaves
+`SpotifyDownloader` with thin compatibility methods. The application’s
+self-test still imports the legacy process-proxy helper through the same module.
+
 ## Intended module boundaries
 
 The first modular Python layout should follow responsibilities already present in

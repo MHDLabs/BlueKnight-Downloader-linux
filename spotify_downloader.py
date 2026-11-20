@@ -1147,6 +1147,8 @@ def extract_binaries(archive_path, wanted):
 from blueknight.network.proxy import (
     ProxyManager,
     Socks5HttpBridge,
+    _PROXY_ENV_KEYS,
+    apply_process_proxy,
     display_proxy_url,
     normalize_proxy_url,
 )
