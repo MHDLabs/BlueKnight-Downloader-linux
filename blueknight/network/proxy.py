@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import os
 import select
@@ -9,6 +10,8 @@ import socket
 import socketserver
 import threading
 from urllib.parse import quote, unquote, urlsplit
+import urllib.error
+import urllib.request
 
 
 __all__ = [
@@ -16,6 +19,7 @@ __all__ = [
     "apply_process_proxy",
     "display_proxy_url",
     "normalize_proxy_url",
+    "ProxyManager",
 ]
 
 
@@ -269,3 +273,179 @@ class Socks5HttpBridge:
             self.server.shutdown()
             self.server.server_close()
             self.server = None
+
+class ProxyManager:
+    """Own proxy settings, route checks and HTTP opener lifetimes."""
+
+    MEDIA_HOST_CHECKS = (
+        ("youtube.com", "https://www.youtube.com/generate_204"),
+        ("googlevideo.com", "https://redirector.googlevideo.com/generate_204"),
+    )
+
+    def __init__(
+        self, *, get_settings, set_settings, log, notify, batch_log,
+        ssl_context, user_agent, app_name, app_version,
+    ):
+        self._get_settings = get_settings
+        self._set_settings = set_settings
+        self._log = log
+        self._notify = notify
+        self._batch_log = batch_log
+        self._ssl_context = ssl_context
+        self._user_agent = user_agent
+        self._app_name = app_name
+        self._app_version = app_version
+
+    def configured_proxy(self):
+        enabled, proxy_type, proxy_url = self._get_settings()
+        if not (enabled and str(proxy_url or "").strip()):
+            return None
+        try:
+            return normalize_proxy_url(proxy_url, proxy_type)
+        except ValueError:
+            return None
+
+    def sync_environment(self):
+        apply_process_proxy(self.configured_proxy())
+
+    def set_preset(self, proxy_type, url):
+        self._set_settings(True, proxy_type, url)
+        self._log(f"Proxy preset set: {proxy_type.upper()} - {url}", "info")
+        if proxy_type == "socks5":
+            self._log("SOCKS5 will use the built-in local bridge.", "info")
+        else:
+            self._log("HTTP proxy ready for spotDL", "success")
+
+    def check_media_hosts(self, opener):
+        reached = {}
+        for label, url in self.MEDIA_HOST_CHECKS:
+            try:
+                request = urllib.request.Request(
+                    url, headers={"User-Agent": self._user_agent}, method="HEAD")
+                with opener.open(request, timeout=15):
+                    pass
+                reached[label] = True
+            except urllib.error.HTTPError:
+                reached[label] = True
+            except Exception as failure:
+                reached[label] = False
+                self._log(
+                    f"Cannot reach {label} on this route: {str(failure)[:120]}",
+                    "warning",
+                )
+
+        for label, ok in reached.items():
+            self._log(f"{'✓' if ok else '✗'} {label}",
+                      "success" if ok else "error")
+
+        if reached.get("youtube.com") and not reached.get("googlevideo.com"):
+            self._log(
+                "YouTube is reachable but its media hosts are not. A download will "
+                "find the video and then fail to fetch it. Send googlevideo.com "
+                "through the same route as youtube.com in your proxy client.",
+                "error",
+            )
+        elif not any(reached.values()):
+            self._log(
+                "Neither host is reachable on this route. The proxy is answering, "
+                "but it is not carrying this traffic.",
+                "error",
+            )
+        return reached
+
+    def test_direct(self):
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=self._ssl_context))
+        reached = self.check_media_hosts(opener)
+        if all(reached.values()):
+            self._notify(
+                "This connection reaches YouTube and its media hosts.", "ok")
+        else:
+            self._notify(
+                "Some hosts are unreachable without a proxy. Set one in "
+                "Connection settings.", "err")
+
+    def test_proxy(self):
+        _, proxy_type, proxy_url = self._get_settings()
+        if not str(proxy_url or "").strip():
+            self._log(
+                "No proxy set — checking the direct connection.", "info")
+            threading.Thread(target=self.test_direct, daemon=True).start()
+            return
+        try:
+            proxy = normalize_proxy_url(proxy_url, proxy_type)
+        except ValueError as exc:
+            self._notify(str(exc), "err")
+            return
+
+        self._log(f"Testing proxy: {display_proxy_url(proxy)}...", "info")
+
+        def do_test():
+            bridge = None
+            try:
+                effective_proxy = proxy
+                if urlsplit(proxy).scheme.startswith("socks5"):
+                    bridge = Socks5HttpBridge(proxy)
+                    effective_proxy = bridge.start()
+                handler = urllib.request.ProxyHandler({
+                    "http": effective_proxy,
+                    "https": effective_proxy,
+                })
+                opener = urllib.request.build_opener(handler)
+                request = urllib.request.Request(
+                    "https://api.ipify.org?format=json",
+                    headers={
+                        "User-Agent": f"{self._app_name}/{self._app_version}"
+                    },
+                )
+                with opener.open(request, timeout=15) as response:
+                    result = response.read().decode("utf-8", "replace")
+                self._log(f"Proxy test succeeded: {result[:120]}", "success")
+                self.check_media_hosts(opener)
+                self._notify("Proxy connection works.", "ok")
+            except Exception as exc:
+                detail = str(exc)[:200]
+                self._log(f"Proxy test failed: {detail}", "error")
+                self._notify(
+                    f"Proxy test failed: {detail}\n\n"
+                    "Check that the proxy app is running and that the type and port match its local settings.",
+                    "err",
+                )
+            finally:
+                if bridge:
+                    bridge.close()
+
+        threading.Thread(target=do_test, daemon=True).start()
+
+    @contextlib.contextmanager
+    def net_opener(self):
+        bridge = None
+        try:
+            handlers = [
+                urllib.request.HTTPSHandler(context=self._ssl_context)
+            ]
+            enabled, proxy_type, proxy_url = self._get_settings()
+            if enabled and str(proxy_url or "").strip():
+                proxy = normalize_proxy_url(proxy_url, proxy_type)
+                if urlsplit(proxy).scheme.startswith("socks5"):
+                    bridge = Socks5HttpBridge(proxy)
+                    proxy = bridge.start()
+                handlers.insert(
+                    0, urllib.request.ProxyHandler({
+                        "http": proxy, "https": proxy,
+                    }))
+            yield urllib.request.build_opener(*handlers)
+        finally:
+            if bridge:
+                bridge.close()
+
+    def prepare_for_spotdl(self, proxy_url, proxy_type):
+        proxy = normalize_proxy_url(proxy_url, proxy_type)
+        if urlsplit(proxy).scheme.startswith("socks5"):
+            bridge = Socks5HttpBridge(proxy)
+            local_proxy = bridge.start()
+            self._batch_log(
+                f"SOCKS5 bridge listening at {local_proxy}", "info")
+            return local_proxy, bridge
+        return proxy, None
+

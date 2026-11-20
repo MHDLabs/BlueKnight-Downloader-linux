@@ -1145,8 +1145,8 @@ def extract_binaries(archive_path, wanted):
 # Proxy helpers live in their own module. These names stay imported here so the
 # existing desktop engine and compatibility scripts keep their public surface.
 from blueknight.network.proxy import (
+    ProxyManager,
     Socks5HttpBridge,
-    apply_process_proxy,
     display_proxy_url,
     normalize_proxy_url,
 )
@@ -1218,6 +1218,25 @@ class SpotifyDownloader:
         self._media_done = 0
         self._media_total = None
         self._stream_index = 0
+
+        # Network operations are delegated to an independent service. The
+        # callbacks keep the existing settings and UI event surface unchanged.
+        self.network = ProxyManager(
+            get_settings=lambda: (
+                self.use_proxy.get(), self.proxy_type.get(), self.proxy_url.get()),
+            set_settings=lambda enabled, kind, url: (
+                self.use_proxy.set(enabled),
+                self.proxy_type.set(kind),
+                self.proxy_url.set(url),
+            ),
+            log=self.log,
+            notify=self.notify,
+            batch_log=self._batch_log,
+            ssl_context=TRUSTED_SSL_CONTEXT,
+            user_agent=BROWSER_UA,
+            app_name=APP_NAME,
+            app_version=APP_VERSION,
+        )
 
     # ------------------------------------------------------------------
     # State the page reads through the bridge
@@ -1415,22 +1434,10 @@ class SpotifyDownloader:
         self._flush_logs()
 
     def configured_proxy(self):
-        """The proxy as one normalised URL, or None. One answer, one place."""
-        if not (self.use_proxy.get() and self.proxy_url.get().strip()):
-            return None
-        try:
-            return normalize_proxy_url(self.proxy_url.get(), self.proxy_type.get())
-        except ValueError:
-            return None
+        return self.network.configured_proxy()
 
     def sync_proxy_env(self):
-        """Make the whole process agree with the proxy setting.
-
-        Called wherever the setting can change and before anything reaches the
-        network, so no part of a download can quietly take a different route
-        from the rest of it.
-        """
-        apply_process_proxy(self.configured_proxy())
+        self.network.sync_environment()
 
     def notify(self, message, kind="info"):
         self.ui("toast", message, kind)
@@ -1452,120 +1459,16 @@ class SpotifyDownloader:
     # Proxy helpers
     # ------------------------------------------------------------------
     def set_proxy_preset(self, proxy_type, url):
-        """Set proxy to a preset configuration"""
-        self.proxy_type.set(proxy_type)
-        self.proxy_url.set(url)
-        self.use_proxy.set(True)
-        self.log(f"Proxy preset set: {proxy_type.upper()} - {url}", "info")
-        
-        if proxy_type == "socks5":
-            self.log("SOCKS5 will use the built-in local bridge.", "info")
-        else:
-            self.log("HTTP proxy ready for spotDL", "success")
-
-    # The two hosts a YouTube download actually needs. Reaching the first and
-    # not the second is the shape of a restricted network, and of a proxy whose
-    # rules cover the site but not the CDN it serves media from — which is the
-    # same split that gets a download refused with 403 after it has started.
-    MEDIA_HOST_CHECKS = (
-        ("youtube.com", "https://www.youtube.com/generate_204"),
-        ("googlevideo.com", "https://redirector.googlevideo.com/generate_204"),
-    )
+        self.network.set_preset(proxy_type, url)
 
     def check_media_hosts(self, opener):
-        """Report whether the route reaches the site and its media hosts alike.
-
-        A proxy test that asks one unrelated server whether it can hear us
-        answers the easy half. Everything about YouTube that goes wrong on a
-        restricted connection goes wrong between these two names.
-        """
-        reached = {}
-        for label, url in self.MEDIA_HOST_CHECKS:
-            try:
-                request = urllib.request.Request(
-                    url, headers={"User-Agent": BROWSER_UA}, method="HEAD")
-                with opener.open(request, timeout=15):
-                    pass
-                reached[label] = True
-            except urllib.error.HTTPError:
-                # Any answer at all means the route got there; which answer it
-                # was is not this test's business.
-                reached[label] = True
-            except Exception as failure:
-                reached[label] = False
-                self.log(f"Cannot reach {label} on this route: {str(failure)[:120]}",
-                         "warning")
-        for label, ok in reached.items():
-            self.log(f"{'✓' if ok else '✗'} {label}", "success" if ok else "error")
-        if reached.get("youtube.com") and not reached.get("googlevideo.com"):
-            self.log("YouTube is reachable but its media hosts are not. A download will "
-                     "find the video and then fail to fetch it. Send googlevideo.com "
-                     "through the same route as youtube.com in your proxy client.",
-                     "error")
-        elif not any(reached.values()):
-            self.log("Neither host is reachable on this route. The proxy is answering, "
-                     "but it is not carrying this traffic.", "error")
-        return reached
+        return self.network.check_media_hosts(opener)
 
     def _test_direct(self):
-        """The same host check, on the connection with nothing in front of it."""
-        opener = urllib.request.build_opener(
-            urllib.request.HTTPSHandler(context=TRUSTED_SSL_CONTEXT))
-        reached = self.check_media_hosts(opener)
-        if all(reached.values()):
-            self.notify("This connection reaches YouTube and its media hosts.", "ok")
-        else:
-            self.notify("Some hosts are unreachable without a proxy. Set one in "
-                        "Connection settings.", "err")
+        return self.network.test_direct()
 
     def test_proxy(self):
-        """Make an HTTPS request through the configured proxy."""
-        # With no proxy filled in, test the connection there is rather than
-        # refusing to test anything. Someone on a restricted network needs to
-        # know which hosts they can reach before they need a proxy, not after.
-        if not self.proxy_url.get().strip():
-            self.log("No proxy set — checking the direct connection.", "info")
-            threading.Thread(target=self._test_direct, daemon=True).start()
-            return
-        try:
-            proxy = normalize_proxy_url(self.proxy_url.get(), self.proxy_type.get())
-        except ValueError as exc:
-            self.notify(str(exc), "err")
-            return
-
-        self.log(f"Testing proxy: {display_proxy_url(proxy)}...", "info")
-
-        def do_test():
-            bridge = None
-            try:
-                effective_proxy = proxy
-                if urlsplit(proxy).scheme.startswith("socks5"):
-                    bridge = Socks5HttpBridge(proxy)
-                    effective_proxy = bridge.start()
-                handler = urllib.request.ProxyHandler({"http": effective_proxy, "https": effective_proxy})
-                opener = urllib.request.build_opener(handler)
-                request = urllib.request.Request(
-                    "https://api.ipify.org?format=json",
-                    headers={"User-Agent": f"{APP_NAME}/{APP_VERSION}"},
-                )
-                with opener.open(request, timeout=15) as response:
-                    result = response.read().decode("utf-8", "replace")
-                self.log(f"Proxy test succeeded: {result[:120]}", "success")
-                self.check_media_hosts(opener)
-                self.notify("Proxy connection works.", "ok")
-            except Exception as exc:
-                detail = str(exc)[:200]
-                self.log(f"Proxy test failed: {detail}", "error")
-                self.notify(
-                    f"Proxy test failed: {detail}\n\n"
-                    "Check that the proxy app is running and that the type and port match its local settings.",
-                    "err",
-                )
-            finally:
-                if bridge:
-                    bridge.close()
-
-        threading.Thread(target=do_test, daemon=True).start()
+        return self.network.test_proxy()
 
     # ------------------------------------------------------------------
     # Setup (unchanged)
@@ -1648,25 +1551,8 @@ class SpotifyDownloader:
 
     @contextlib.contextmanager
     def _net_opener(self):
-        """A urllib opener that honours the configured proxy.
-
-        Fetching tools is exactly the traffic a restricted network blocks, so
-        it goes through the same proxy the downloads themselves use.
-        """
-        bridge = None
-        try:
-            handlers = [urllib.request.HTTPSHandler(context=TRUSTED_SSL_CONTEXT)]
-            if self.use_proxy.get() and self.proxy_url.get().strip():
-                proxy = normalize_proxy_url(self.proxy_url.get(), self.proxy_type.get())
-                if urlsplit(proxy).scheme.startswith("socks5"):
-                    bridge = Socks5HttpBridge(proxy)
-                    proxy = bridge.start()
-                handlers.insert(
-                    0, urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
-            yield urllib.request.build_opener(*handlers)
-        finally:
-            if bridge:
-                bridge.close()
+        with self.network.net_opener() as opener:
+            yield opener
 
     def _download_with_fallbacks(self, urls, destination, label):
         """Download atomically, trying independent hosts in order."""
@@ -2620,14 +2506,7 @@ class SpotifyDownloader:
             self.ui("finished")
 
     def _prepare_proxy(self, proxy_url, proxy_type):
-        """Return an HTTP proxy URL accepted by spotDL and an optional bridge."""
-        proxy = normalize_proxy_url(proxy_url, proxy_type)
-        if urlsplit(proxy).scheme.startswith("socks5"):
-            bridge = Socks5HttpBridge(proxy)
-            local_proxy = bridge.start()
-            self._batch_log(f"SOCKS5 bridge listening at {local_proxy}", "info")
-            return local_proxy, bridge
-        return proxy, None
+        return self.network.prepare_for_spotdl(proxy_url, proxy_type)
 
     def download_with_spotdl(self, url, output, options):
         """Optimized download with proxy support"""
