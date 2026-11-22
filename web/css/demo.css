@@ -1,0 +1,34 @@
+.demo-banner {
+  position: fixed;
+  z-index: 1000;
+  top: 48px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 12px;
+  border: 1px solid rgba(91, 153, 255, .28);
+  border-radius: 999px;
+  background: rgba(9, 17, 30, .94);
+  color: #dbe8ff;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .28);
+  backdrop-filter: blur(14px);
+  font: 11px/1.3 var(--font-mono, monospace);
+  pointer-events: none;
+}
+.demo-banner strong {
+  color: #76aaff;
+  font-size: 10px;
+  letter-spacing: .1em;
+}
+.demo-banner span { color: #aebbd0; }
+@media (max-width: 620px) {
+  .demo-banner {
+    top: 46px;
+    right: 10px;
+    left: 10px;
+    justify-content: center;
+    font-size: 10px;
+  }
+}
