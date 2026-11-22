@@ -52,6 +52,8 @@ function converterOptions() {
 function toast(message, kind = "info", ms = 5200) {
   const el = document.createElement("div");
   el.className = "toast " + kind;
+  el.setAttribute("role", kind === "err" ? "alert" : "status");
+  el.setAttribute("aria-atomic", "true");
   el.textContent = message;
   $("toasts").appendChild(el);
   setTimeout(() => el.remove(), ms);
