@@ -25,6 +25,8 @@ class ReleaseFlavorTests(unittest.TestCase):
         self.assertIn("target: windows-x64, flavor: full", self.workflow)
         self.assertIn("actions/upload-artifact@v6", self.workflow)
         self.assertIn("BLUEKNIGHT_EXPECT_FLAVOR", self.workflow)
+        self.assertIn("verify-packages:", self.workflow)
+        self.assertIn("if lite.stat().st_size >= full.stat().st_size:", self.workflow)
 
     def test_release_is_explicitly_a_prerelease(self):
         self.assertIn("prerelease: true", self.workflow)
