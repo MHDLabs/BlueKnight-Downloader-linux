@@ -1813,6 +1813,7 @@ html.android .nav button .dot { display: none; }
 /* Respect the OS request to reduce transparency without changing layout. */
 @media (prefers-reduced-transparency: reduce) {
   .side,
+  .mbar,
   .mbar-source,
   .mbar-btn,
   .mbar #theme-btn,
