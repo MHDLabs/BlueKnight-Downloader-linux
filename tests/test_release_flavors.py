@@ -39,6 +39,7 @@ class ReleaseFlavorTests(unittest.TestCase):
         self.assertIn("GH_TOKEN: ${{ github.token }}", self.tag_workflow)
         self.assertIn("actions: write", self.tag_workflow)
         self.assertIn("actions/workflows/downloader.yml/dispatches", self.tag_workflow)
+        self.assertIn('Content-Type: application/json', self.tag_workflow)
 
     def test_linux_lite_does_not_bundle_native_engines_or_full_sidecars(self):
         self.assertIn('--flavor)', self.linux_build)
