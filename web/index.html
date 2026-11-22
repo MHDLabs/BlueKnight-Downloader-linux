@@ -603,7 +603,10 @@
         </div>
       </div>
 
-      <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
+      <div class="bar" role="progressbar" aria-label="Download progress"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="bar-fill" id="bar-fill"></div>
+      </div>
       <!-- Where the file is going: the question every download prompts. -->
       <div class="run-path" id="run-path"></div>
       <div class="run-stats">
@@ -652,7 +655,7 @@
     <img src="logo.png" alt="Blue Knight">
     <h2 id="gate-title">Setting up</h2>
     <p id="gate-detail">First launch takes a moment.</p>
-    <div class="gate-bar"></div>
+    <div class="gate-bar" role="progressbar" aria-label="Setting up media components"></div>
     <div class="gate-detail">Fetching FFmpeg and spotDL</div>
     <button class="btn" id="gate-skip" hidden>Continue anyway</button>
   </div>
