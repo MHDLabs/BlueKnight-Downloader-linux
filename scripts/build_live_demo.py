@@ -62,6 +62,8 @@ def main() -> int:
     html = html.replace(BODY, BODY + '\n<div class="demo-banner" role="status">'
                         '<strong>LIVE DEMO</strong>'
                         '<span>Sample environment · No files are downloaded</span>'
+                        '<a href="https://github.com/MHDLabs/BlueKnight-Downloader-linux/releases" '
+                        'target="_blank" rel="noopener noreferrer">Get the app</a>'
                         '</div>', 1)
     html = html.replace("</head>", DEMO_STYLESHEET + "\n</head>", 1)
     html = html.replace(RUNTIME_SCRIPT, DEMO_SCRIPT + "\n" + RUNTIME_SCRIPT, 1)
