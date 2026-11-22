@@ -1317,7 +1317,8 @@ class SpotifyDownloader:
         """Install only the engines required to start this media workflow."""
         self.ensure_tool("yt-dlp")
         self.ensure_ffmpeg()
-        if kind in YOUTUBE_KINDS and not self.js_runtime()[0]:
+        if kind in YOUTUBE_KINDS and not self.deno_cmd:
+            # The bundled YouTube.js and PO-token fallbacks explicitly run on Deno.
             self.ensure_tool("deno")
 
     def component_summary(self):
