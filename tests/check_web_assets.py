@@ -166,6 +166,10 @@ def main() -> int:
         raise AssertionError("The mobile section dialog must support Escape and trapped Tab navigation")
     if "sheetFocusables" not in shell or "target.focus()" not in shell:
         raise AssertionError("The mobile section dialog must manage and restore keyboard focus")
+    if "el.tabIndex >= 0" not in shell:
+        raise AssertionError("The mobile section dialog must exclude non-tabbable backdrop controls")
+    if "focusWasInside" not in shell or 'document.querySelector("#nav button.on")?.focus()' not in shell:
+        raise AssertionError("The mobile section dialog must close cleanly when switching to desktop layout")
     if 'closeSheet({ restoreFocus: false })' not in routing:
         raise AssertionError("Shared-link routing must not steal focus back from its destination field")
     if 'setAttribute("role", kind === "err" ? "alert" : "status")' not in components:
