@@ -12,6 +12,28 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENDOR="$ROOT/vendor"
 OUTPUT="$ROOT/release"
 WORK="$ROOT/build"
+FLAVOR="${BLUEKNIGHT_FLAVOR:-full}"
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --flavor)
+            [ "$#" -ge 2 ] || { echo "Missing value for --flavor" >&2; exit 2; }
+            FLAVOR="$2"
+            shift 2
+            ;;
+        --flavor=*)
+            FLAVOR="${1#*=}"
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+case "$FLAVOR" in
+    lite|full) ;;
+    *) echo "Flavor must be 'lite' or 'full' (got '$FLAVOR')." >&2; exit 2 ;;
+esac
 
 SPOTDL_VERSION="4.5.2"
 YTJS_VERSION="18.0.0"
@@ -24,7 +46,11 @@ case "$(uname -m)" in
     arm64|aarch64) ARCH=arm64 ;;
     *) ARCH=x64 ;;
 esac
-echo "Building for $OS_TAG/$ARCH"
+if [ "$OS_TAG" != "linux" ] && [ "$FLAVOR" = "lite" ]; then
+    echo "The Lite flavor is currently available for Linux only." >&2
+    exit 2
+fi
+echo "Building for $OS_TAG/$ARCH ($FLAVOR)"
 
 # --------------------------------------------------------------------------
 # pywebview has no window to draw on a Linux box without the WebKit GTK
@@ -59,8 +85,11 @@ fetch() {  # fetch <url> <destination>
     curl --fail --location --silent --show-error --retry 3 -o "$2" "$1"
 }
 
-mkdir -p "$VENDOR"
+rm -rf "$OUTPUT" "$WORK"
+mkdir -p "$VENDOR" "$OUTPUT" "$WORK"
+printf '%s\n' "$FLAVOR" > "$OUTPUT/release-flavor.txt"
 
+if [ "$FLAVOR" = "full" ]; then
 # --- spotDL, yt-dlp, Deno: one release binary each -------------------------
 if [ "$OS_TAG" = mac ]; then
     SPOTDL_ASSET="spotdl-${SPOTDL_VERSION}-darwin"
@@ -106,6 +135,7 @@ chmod +x "$VENDOR/spotdl" "$VENDOR/yt-dlp" "$VENDOR/deno" "$VENDOR/ffmpeg" "$VEN
 # Windows build makes FFmpeg prove it launches before bundling; so does this.
 FFMPEG_BANNER="$("$VENDOR/ffmpeg" -version | head -n 1)"
 echo "Bundling $FFMPEG_BANNER"
+fi
 
 # gallery-dl imports each site's extractor by name at runtime, so a normal
 # import scan finds none of them and the frozen app would be able to do yt-dlp
@@ -124,13 +154,18 @@ PYI_ARGS=(
     --hidden-import img2pdf
     --add-data "$ROOT/web:web"
     --add-data "$ROOT/assets:assets"
-    --add-binary "$VENDOR/spotdl:tools"
-    --add-binary "$VENDOR/yt-dlp:tools"
-    --add-binary "$VENDOR/deno:tools"
-    --add-binary "$VENDOR/ffmpeg:tools"
-    --add-binary "$VENDOR/ffprobe:tools"
+    --add-data "$OUTPUT/release-flavor.txt:."
 )
 
+if [ "$FLAVOR" = "full" ]; then
+    PYI_ARGS+=(--add-binary "$VENDOR/spotdl:tools")
+    PYI_ARGS+=(--add-binary "$VENDOR/yt-dlp:tools")
+    PYI_ARGS+=(--add-binary "$VENDOR/deno:tools")
+    PYI_ARGS+=(--add-binary "$VENDOR/ffmpeg:tools")
+    PYI_ARGS+=(--add-binary "$VENDOR/ffprobe:tools")
+fi
+
+if [ "$FLAVOR" = "full" ]; then
 # The desktop's second YouTube engine, built from source rather than fetched:
 # it is our own wrapper around YoutubeExplode and the .NET SDK is all it needs.
 # A clone without the SDK still produces a working app, one engine shorter.
@@ -158,9 +193,10 @@ if [ ! -f "$YOUTUBE_EXPLODE" ]; then
 fi
 [ -f "$YOUTUBE_EXPLODE" ] && PYI_ARGS+=(--add-binary "$YOUTUBE_EXPLODE:tools")
 
-# The YouTube.js engine: our two scripts plus the library, bundled as one file
-# so nothing is fetched at run time. Deno already ships for yt-dlp's challenge
-# solver, so this engine costs a script rather than another runtime.
+fi
+
+# The YouTube.js engine: our two scripts plus the library, bundled as one file.
+# Both flavors include the small resolver; Lite fetches Deno only when needed.
 YTJS_BUNDLE="$ROOT/engines/youtubejs/youtubei.bundle.mjs"
 if [ ! -f "$YTJS_BUNDLE" ]; then
     echo "  fetching the YouTube.js library"
@@ -168,8 +204,8 @@ if [ ! -f "$YTJS_BUNDLE" ]; then
 fi
 PYI_ARGS+=(--add-data "$ROOT/engines/youtubejs:tools")
 
-# The NewPipe engine and a runtime to run it in. Skipped without a JDK, like
-# the .NET engine is without its SDK: a clone still builds, one engine shorter.
+if [ "$FLAVOR" = "full" ]; then
+# The NewPipe engine and a runtime to run it in. Full builds include the JVM fallback.
 NEWPIPE_JAR="$VENDOR/blueknight-newpipe.jar"
 if [ ! -f "$NEWPIPE_JAR" ] && command -v java >/dev/null 2>&1; then
     echo "  building the NewPipe engine"
@@ -184,6 +220,7 @@ if [ -f "$NEWPIPE_JAR" ]; then
         jlink --add-modules java.base,java.net.http,java.naming,jdk.crypto.ec               --strip-debug --no-header-files --no-man-pages --compress=2               --output "$VENDOR/jre"
     fi
     [ -d "$VENDOR/jre" ] && PYI_ARGS+=(--add-data "$VENDOR/jre:tools/jre")
+fi
 fi
 if [ "$OS_TAG" = mac ]; then
     # .icns is the only icon format a bundle accepts; skip rather than fail
@@ -205,9 +242,9 @@ if [ "$OS_TAG" = mac ]; then
     zip -q "$PACKAGE" README.md THIRD_PARTY_NOTICES.txt LICENSE
     echo "Application bundle created at $OUTPUT/BlueKnightDownloader.app"
 else
-    PACKAGE="BlueKnightDownloader-linux-${ARCH}.tar.gz"
+    PACKAGE="BlueKnightDownloader-linux-${ARCH}-${FLAVOR}.tar.gz"
     : > portable.mode
-    tar -czf "$PACKAGE" BlueKnightDownloader portable.mode README.md THIRD_PARTY_NOTICES.txt LICENSE
+    tar -czf "$PACKAGE" BlueKnightDownloader portable.mode release-flavor.txt README.md THIRD_PARTY_NOTICES.txt LICENSE
     echo "Standalone executable created at $OUTPUT/BlueKnightDownloader"
 fi
 echo "Release package created at $OUTPUT/$PACKAGE"
