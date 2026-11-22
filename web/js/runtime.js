@@ -358,6 +358,30 @@ function wire() {
       paintConverter();
     };
   });
+  document.querySelectorAll(".format-picker").forEach(group => {
+    group.addEventListener("keydown", event => {
+      const radios = [...group.querySelectorAll('[role="radio"]:not([disabled])')];
+      const current = radios.indexOf(document.activeElement);
+      if (current < 0 || !radios.length) return;
+
+      let next = current;
+      if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+        next = (current + 1) % radios.length;
+      } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+        next = (current - 1 + radios.length) % radios.length;
+      } else if (event.key === "Home") {
+        next = 0;
+      } else if (event.key === "End") {
+        next = radios.length - 1;
+      } else {
+        return;
+      }
+
+      event.preventDefault();
+      radios[next].focus();
+      radios[next].click();
+    });
+  });
   $("media-convert-resize").onchange = paintConverter;
   $("media-convert-fps").onchange = paintConverter;
   $("convert-media").onclick = () => api().convert_media(converterOptions());
