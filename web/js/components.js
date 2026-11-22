@@ -132,10 +132,12 @@ function jobPercent(filePct) {
 }
 
 function setProgress(pct, kind) {
+  const value = Math.max(0, Math.min(100, Number(pct) || 0));
   const fill = $("bar-fill");
-  fill.style.width = Math.max(0, Math.min(100, pct)) + "%";
+  fill.style.width = value + "%";
   fill.className = "bar-fill" + (kind ? " " + kind : "");
-  $("stat-pct").textContent = Math.round(pct) + "%";
+  $("stat-pct").textContent = Math.round(value) + "%";
+  fill.parentElement?.setAttribute("aria-valuenow", String(Math.round(value)));
 }
 
 function refreshStats() {
