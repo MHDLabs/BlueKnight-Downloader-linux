@@ -32,6 +32,8 @@ def main() -> int:
         raise AssertionError("The demo adapter must load before runtime.js")
     if 'class="demo-banner"' not in html or "No files are downloaded" not in html:
         raise AssertionError("The demo must visibly disclose that it is simulated")
+    if 'href="https://github.com/MHDLabs/BlueKnight-Downloader-linux/releases"' not in html:
+        raise AssertionError("The demo must link to the desktop releases")
     if '<link rel="stylesheet" href="./css/demo.css">' not in html:
         raise AssertionError("The demo stylesheet is not linked")
 
