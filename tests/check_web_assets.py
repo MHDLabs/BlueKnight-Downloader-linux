@@ -128,6 +128,81 @@ def main() -> int:
 
     css_path = local_file(parser.stylesheets[0], WEB)
     css = css_path.read_text(encoding="utf-8")
+    components = (WEB / "js" / "components.js").read_text(encoding="utf-8")
+    shell = (WEB / "js" / "shell.js").read_text(encoding="utf-8")
+    routing = (WEB / "js" / "routing.js").read_text(encoding="utf-8")
+    runtime = (WEB / "js" / "runtime.js").read_text(encoding="utf-8")
+
+    ui_text = html + routing
+    if any(marker in ui_text for marker in ("â†", "âœ", "�")):
+        raise AssertionError("The frontend contains visibly corrupted UTF-8 text")
+
+    if 'id="convert"' in html:
+        raise AssertionError("The retired, unhandled MP3-to-FLAC control must not be rendered")
+
+    source_input_labels = {
+        "url": "Spotify link", "yt-url": "YouTube link", "ym-url": "YouTube Music link",
+        "tt-url": "TikTok link or username", "ig-url": "Instagram link",
+        "sc-url": "SoundCloud link", "x-url": "X post link",
+        "gen-url": "Video or media page link", "pdf-url": "Document or ebook link",
+    }
+    for element_id, label in source_input_labels.items():
+        pattern = rf'<input\b[^>]*\bid="{re.escape(element_id)}"[^>]*\baria-label="{re.escape(label)}"'
+        if not re.search(pattern, html):
+            raise AssertionError(f"Source input {element_id!r} must have an accessible name")
+
+    if 'role="tablist"' in html or 'role="tab"' in html:
+        raise AssertionError("Pressed converter-mode buttons must not claim tab semantics")
+    if 'role="group" aria-label="Converter type"' not in html:
+        raise AssertionError("Converter mode buttons must have a named toggle group")
+    if 'button.tabIndex = selected ? 0 : -1;' not in components:
+        raise AssertionError("Format radio groups must keep one selected tab stop")
+    if 'event.key === "ArrowRight"' not in runtime or 'event.key === "Home"' not in runtime:
+        raise AssertionError("Format radio groups must support arrow, Home, and End keyboard navigation")
+
+    if 'aria-controls="sheet"' not in html or 'aria-expanded="false"' not in html:
+        raise AssertionError("Mobile menu triggers must expose their controlled dialog state")
+    if 'event.key === "Escape"' not in shell or 'event.key !== "Tab"' not in shell:
+        raise AssertionError("The mobile section dialog must support Escape and trapped Tab navigation")
+    if "sheetFocusables" not in shell or "target.focus()" not in shell:
+        raise AssertionError("The mobile section dialog must manage and restore keyboard focus")
+    if "el.tabIndex >= 0" not in shell:
+        raise AssertionError("The mobile section dialog must exclude non-tabbable backdrop controls")
+    if "focusWasInside" not in shell or 'document.querySelector("#nav button.on")?.focus()' not in shell:
+        raise AssertionError("The mobile section dialog must close cleanly when switching to desktop layout")
+    if 'closeSheet({ restoreFocus: false })' not in routing:
+        raise AssertionError("Shared-link routing must not steal focus back from its destination field")
+    if 'setAttribute("role", kind === "err" ? "alert" : "status")' not in components:
+        raise AssertionError("Notifications must be announced to assistive technology")
+
+    if 'role="progressbar"' not in html or 'aria-valuenow="0"' not in html:
+        raise AssertionError("Download progress must expose its initial accessible value")
+    if 'aria-label="Setting up media components"' not in html:
+        raise AssertionError("Setup progress must expose an indeterminate accessible label")
+    if 'setAttribute("aria-valuenow"' not in components:
+        raise AssertionError("Download progress must keep its accessible value in sync")
+
+    required_visual_rules = (
+        "::selection",
+        "caret-color: var(--spotify)",
+        "text-underline-offset:",
+        "user-select: text",
+        "--chrome-surface:",
+        "--chrome-filter:",
+        ".bar::after",
+        "@media (prefers-reduced-transparency: reduce)",
+        ".mbar,",
+        ".nav button:focus-visible",
+        ".format-picker button:focus-visible",
+    )
+    missing_visual_rules = [rule for rule in required_visual_rules if rule not in css]
+    if missing_visual_rules:
+        raise AssertionError(f"Frosted navigation/progress rules missing: {missing_visual_rules!r}")
+    if "box-shadow: 0 0 18px color-mix(in srgb, var(--spotify) 24%, transparent);" in css:
+        raise AssertionError("Selected format controls must not use a decorative glow")
+    if "box-shadow: 0 0 8px var(--spotify);" in css:
+        raise AssertionError("Active navigation must not use a decorative glow")
+
     css_urls = re.findall(r"url\(\s*(['\"]?)(.*?)\1\s*\)", css, re.IGNORECASE)
     for _, reference in css_urls:
         reference = reference.strip()

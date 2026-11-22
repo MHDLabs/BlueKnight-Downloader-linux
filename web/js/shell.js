@@ -181,6 +181,46 @@ function syncPhoneProgress() {
    it feel like a menu rather than a surface. It now leaves the same way it
    arrived, so the close is held open long enough for the exit to play. */
 let sheetExit = null;
+let sheetReturnFocus = null;
+let sheetRestoreFocus = true;
+
+function sheetFocusables() {
+  return [...$("sheet").querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )].filter(el =>
+    el.tabIndex >= 0 && !el.hidden && el.getAttribute("aria-hidden") !== "true" && el.getClientRects().length
+  );
+}
+
+function handleSheetKeydown(event) {
+  const sheet = $("sheet");
+  if (sheet.hidden) return;
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeSheet();
+    return;
+  }
+  if (event.key !== "Tab") return;
+
+  const focusables = sheetFocusables();
+  if (!focusables.length) {
+    event.preventDefault();
+    $("sheet-close").focus();
+    return;
+  }
+
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  const outside = !sheet.contains(document.activeElement);
+  if (event.shiftKey && (document.activeElement === first || outside)) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && (document.activeElement === last || outside)) {
+    event.preventDefault();
+    first.focus();
+  }
+}
 
 function openSheet() {
   const current = document.querySelector(".page.on")?.dataset.page;
@@ -191,21 +231,38 @@ function openSheet() {
     const now = String(t.dataset.target === current);
     if (t.getAttribute("aria-current") !== now) t.setAttribute("aria-current", now);
   });
+  const sheet = $("sheet");
+  if (sheet.hidden) {
+    const active = document.activeElement;
+    sheetReturnFocus = active && active !== document.body ? active : $("mbar-source");
+    sheetRestoreFocus = true;
+  }
   clearTimeout(sheetExit);
-  $("sheet").classList.remove("closing");
-  $("sheet").hidden = false;
+  sheet.classList.remove("closing");
+  sheet.hidden = false;
   $("mbar-source").setAttribute("aria-expanded", "true");
+  $("mbar-more").setAttribute("aria-expanded", "true");
+  const selected = [...sheet.querySelectorAll("#sheet-grid .tile")]
+    .find(tile => tile.getAttribute("aria-current") === "true");
+  (selected || sheet.querySelector("#sheet-grid .tile"))?.focus();
 }
 
-function closeSheet() {
+function closeSheet({ restoreFocus = true } = {}) {
   const sheet = $("sheet");
   $("mbar-source").setAttribute("aria-expanded", "false");
-  if (sheet.hidden) return;
+  $("mbar-more").setAttribute("aria-expanded", "false");
+  if (sheet.hidden || sheet.classList.contains("closing")) return;
   clearTimeout(sheetExit);
+  sheetRestoreFocus = restoreFocus;
   sheet.classList.add("closing");
   sheetExit = setTimeout(() => {
     sheet.hidden = true;
     sheet.classList.remove("closing");
+    const target = sheetReturnFocus;
+    sheetReturnFocus = null;
+    if (sheetRestoreFocus && target?.isConnected && typeof target.focus === "function") {
+      target.focus();
+    }
   }, 190);
 }
 
@@ -217,6 +274,19 @@ function setupPhone() {
     if (foot) document.querySelector(".side").appendChild(foot);
     // Last child of the sidebar footer is where it started.
     if (foot && theme) foot.appendChild(theme);
+
+    // A phone sheet must not survive a rotation or resize into desktop layout.
+    const sheet = $("sheet");
+    if (!sheet.hidden) {
+      const focusWasInside = sheet.contains(document.activeElement);
+      clearTimeout(sheetExit);
+      sheet.hidden = true;
+      sheet.classList.remove("closing");
+      sheetReturnFocus = null;
+      $("mbar-source").setAttribute("aria-expanded", "false");
+      $("mbar-more").setAttribute("aria-expanded", "false");
+      if (focusWasInside) document.querySelector("#nav button.on")?.focus();
+    }
     return;
   }
   // Theme is a property of the app, not of the section you are picking, so on
@@ -226,6 +296,7 @@ function setupPhone() {
   if (!setupPhone.done) {
     setupPhone.done = true;
     buildSheet();
+    document.addEventListener("keydown", handleSheetKeydown);
     decoratePages();
     $("mbar-icon").style.setProperty("--section-tint", sectionTint("download"));
     $("mbar-icon").innerHTML = sectionSvg("download");

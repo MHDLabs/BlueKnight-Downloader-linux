@@ -12,9 +12,9 @@
 <div class="shell">
   <div class="titlebar">
     <div class="grab pywebview-drag-region"></div>
-    <button class="wbtn" id="w-min" title="Minimize">&#8211;</button>
-    <button class="wbtn" id="w-max" title="Maximize">&#9633;</button>
-    <button class="wbtn close" id="w-close" title="Close">&#10005;</button>
+    <button class="wbtn" id="w-min" title="Minimize" aria-label="Minimize window">&#8211;</button>
+    <button class="wbtn" id="w-max" title="Maximize" aria-label="Maximize window">&#9633;</button>
+    <button class="wbtn close" id="w-close" title="Close" aria-label="Close window">&#10005;</button>
   </div>
 
   <!-- Phone only; the desktop keeps its sidebar. A phone has room for one
@@ -22,15 +22,15 @@
        on screen belongs to whichever source is open. -->
   <header class="mbar" id="mbar">
     <img class="mbar-mark" src="logo.png" alt="">
-    <button class="mbar-source" id="mbar-source" aria-haspopup="dialog" aria-expanded="false">
+    <button class="mbar-source" id="mbar-source" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false">
       <span class="mbar-kicker">Source</span>
       <span class="mbar-name"><span class="mbar-icon" id="mbar-icon" aria-hidden="true"></span><span id="mbar-label">Spotify</span></span>
     </button>
     <div class="mbar-eq" aria-hidden="true">
       <div class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></div>
     </div>
-    <button class="mbar-btn" id="mbar-more" aria-haspopup="dialog"
-            aria-label="Choose a source">
+    <button class="mbar-btn" id="mbar-more" aria-haspopup="dialog" aria-controls="sheet"
+            aria-expanded="false" aria-label="Choose a source">
       <span></span><span></span><span></span>
     </button>
   </header>
@@ -83,7 +83,7 @@
       </div>
 
       <div class="paste-row">
-        <input type="text" id="url" placeholder="https://open.spotify.com/track/…" spellcheck="false">
+        <input type="text" id="url" placeholder="https://open.spotify.com/track/…" spellcheck="false" aria-label="Spotify link">
         <button class="btn" data-paste="url">Paste</button>
         <button class="btn primary" id="download">Download</button>
         <button class="btn danger" id="stop" disabled>Stop</button>
@@ -99,23 +99,23 @@
       </div>
 
       <div class="paste-row">
-        <input type="text" id="yt-url" placeholder="https://www.youtube.com/watch?v=…" spellcheck="false">
+        <input type="text" id="yt-url" placeholder="https://www.youtube.com/watch?v=…" spellcheck="false" aria-label="YouTube link">
         <button class="btn" data-paste="yt-url">Paste</button>
         <button class="btn primary" id="yt-go">Download</button>
         <button class="btn danger" id="yt-stop" disabled>Stop</button>
       </div>
 
       <div class="field field--offset-top">
-        <label>Get</label>
-        <div class="segment" id="yt-kind">
+        <label id="yt-kind-label">Get</label>
+        <div class="segment" id="yt-kind" role="group" aria-labelledby="yt-kind-label">
           <button data-value="video" aria-pressed="true">Video</button>
           <button data-value="audio" aria-pressed="false">Audio only</button>
         </div>
         <span></span>
       </div>
       <div class="field" id="yt-quality-field">
-        <label>Video quality</label>
-        <div class="segment" id="yt-quality">
+        <label id="yt-quality-label">Video quality</label>
+        <div class="segment" id="yt-quality" role="group" aria-labelledby="yt-quality-label">
           <button data-value="best" aria-pressed="true">Best</button>
           <button data-value="1080" aria-pressed="false">1080p</button>
           <button data-value="720" aria-pressed="false">720p</button>
@@ -144,7 +144,7 @@
       </div>
 
       <div class="paste-row">
-        <input type="text" id="ym-url" placeholder="https://music.youtube.com/watch?v=… or /playlist?list=…" spellcheck="false">
+        <input type="text" id="ym-url" placeholder="https://music.youtube.com/watch?v=… or /playlist?list=…" spellcheck="false" aria-label="YouTube Music link">
         <button class="btn" data-paste="ym-url">Paste</button>
         <button class="btn primary" id="ym-go">Download</button>
         <button class="btn danger" id="ym-stop" disabled>Stop</button>
@@ -169,15 +169,15 @@
       </div>
 
       <div class="paste-row">
-        <input type="text" id="tt-url" placeholder="https://www.tiktok.com/@user/video/… or @username" spellcheck="false">
+        <input type="text" id="tt-url" placeholder="https://www.tiktok.com/@user/video/… or @username" spellcheck="false" aria-label="TikTok link or username">
         <button class="btn" data-paste="tt-url">Paste</button>
         <button class="btn primary" id="tt-go">Download</button>
         <button class="btn danger" id="tt-stop" disabled>Stop</button>
       </div>
 
       <div class="field field--offset-top">
-        <label>Video quality</label>
-        <div class="segment" id="tt-quality">
+        <label id="tt-quality-label">Video quality</label>
+        <div class="segment" id="tt-quality" role="group" aria-labelledby="tt-quality-label">
           <button data-value="best" aria-pressed="true">Best</button>
           <button data-value="1080" aria-pressed="false">1080p</button>
           <button data-value="720" aria-pressed="false">720p</button>
@@ -202,7 +202,7 @@
       </div>
 
       <div class="paste-row">
-        <input type="text" id="ig-url" placeholder="https://www.instagram.com/reel/… or @username" spellcheck="false">
+        <input type="text" id="ig-url" placeholder="https://www.instagram.com/reel/… or @username" spellcheck="false" aria-label="Instagram link">
         <button class="btn" data-paste="ig-url">Paste</button>
         <button class="btn primary" id="ig-go">Download</button>
         <button class="btn danger" id="ig-stop" disabled>Stop</button>
@@ -227,7 +227,7 @@
         <p class="lede">Paste a track, playlist, or profile link. Audio uses the format and bitrate selected in Downloader settings.</p>
       </div>
       <div class="paste-row">
-        <input type="text" id="sc-url" placeholder="https://soundcloud.com/artist/track" spellcheck="false">
+        <input type="text" id="sc-url" placeholder="https://soundcloud.com/artist/track" spellcheck="false" aria-label="SoundCloud link">
         <button class="btn" data-paste="sc-url">Paste</button>
         <button class="btn primary" id="sc-go">Download</button>
         <button class="btn danger" id="sc-stop" disabled>Stop</button>
@@ -251,14 +251,14 @@
         <p class="lede">Paste any x.com or twitter.com post. Video comes down at the quality you pick; photo posts, GIFs and mixed posts are collected at full resolution.</p>
       </div>
       <div class="paste-row">
-        <input type="text" id="x-url" placeholder="https://x.com/user/status/123" spellcheck="false">
+        <input type="text" id="x-url" placeholder="https://x.com/user/status/123" spellcheck="false" aria-label="X post link">
         <button class="btn" data-paste="x-url">Paste</button>
         <button class="btn primary" id="x-go">Download</button>
         <button class="btn danger" id="x-stop" disabled>Stop</button>
       </div>
       <div class="field field--offset-top">
-        <label>Video quality</label>
-        <div class="segment" id="x-quality">
+        <label id="x-quality-label">Video quality</label>
+        <div class="segment" id="x-quality" role="group" aria-labelledby="x-quality-label">
           <button data-value="best" aria-pressed="true">Best</button>
           <button data-value="1080" aria-pressed="false">1080p</button>
           <button data-value="720" aria-pressed="false">720p</button>
@@ -280,22 +280,22 @@
         <p class="lede">Paste a public video page or direct media link. yt-dlp handles regular video, Streamlink covers live streams, and HTML5, gallery, and direct-file fallbacks cover the rest. YouTube links stay on the dedicated YouTube page.</p>
       </div>
       <div class="paste-row">
-        <input type="text" id="gen-url" placeholder="https://example.com/watch/video" spellcheck="false">
+        <input type="text" id="gen-url" placeholder="https://example.com/watch/video" spellcheck="false" aria-label="Video or media page link">
         <button class="btn" data-paste="gen-url">Paste</button>
         <button class="btn primary" id="gen-go">Download</button>
         <button class="btn danger" id="gen-stop" disabled>Stop</button>
       </div>
       <div class="field field--offset-top">
-        <label>Get</label>
-        <div class="segment" id="gen-kind">
+        <label id="gen-kind-label">Get</label>
+        <div class="segment" id="gen-kind" role="group" aria-labelledby="gen-kind-label">
           <button data-value="video" aria-pressed="true">Video</button>
           <button data-value="audio" aria-pressed="false">Audio only</button>
         </div>
         <span></span>
       </div>
       <div class="field" id="gen-quality-field">
-        <label>Video quality</label>
-        <div class="segment" id="gen-quality">
+        <label id="gen-quality-label">Video quality</label>
+        <div class="segment" id="gen-quality" role="group" aria-labelledby="gen-quality-label">
           <button data-value="best" aria-pressed="true">Best</button>
           <button data-value="1080" aria-pressed="false">1080p</button>
           <button data-value="720" aria-pressed="false">720p</button>
@@ -319,14 +319,14 @@
         <p class="lede" id="doc-lede">Paste a direct document or ebook link, or a page that links to files. Valid downloads keep their original format.</p>
       </div>
       <div class="paste-row">
-        <input type="text" id="pdf-url" placeholder="https://example.com/book.epub or a document index" spellcheck="false">
+        <input type="text" id="pdf-url" placeholder="https://example.com/book.epub or a document index" spellcheck="false" aria-label="Document or ebook link">
         <button class="btn" data-paste="pdf-url">Paste</button>
         <button class="btn primary" id="pdf-go">Download</button>
         <button class="btn danger" id="pdf-stop" disabled>Stop</button>
       </div>
       <div class="field field--offset-top">
-        <label>Download type</label>
-        <div class="segment" id="doc-kind">
+        <label id="doc-kind-label">Download type</label>
+        <div class="segment" id="doc-kind" role="group" aria-labelledby="doc-kind-label">
           <button data-value="document" aria-pressed="true">Document / ebook</button>
           <button data-value="manga" aria-pressed="false">Manga / manhwa</button>
         </div>
@@ -364,8 +364,8 @@
           <span></span>
         </div>
         <div class="field" id="proxy-type-field">
-          <label>Type</label>
-          <div class="segment" id="proxy-type">
+          <label id="proxy-type-label">Type</label>
+          <div class="segment" id="proxy-type" role="group" aria-labelledby="proxy-type-label">
             <button data-value="http" aria-pressed="true">HTTP</button>
             <button data-value="socks5" aria-pressed="false">SOCKS5</button>
           </div>
@@ -400,8 +400,8 @@
       <div class="scroll">
         <div class="group-head"><span>Format</span><span class="line"></span></div>
         <div class="field">
-          <label>File format</label>
-          <div class="segment" id="format">
+          <label id="format-label">File format</label>
+          <div class="segment" id="format" role="group" aria-labelledby="format-label">
             <button data-value="mp3" aria-pressed="true">MP3</button>
             <button data-value="flac" aria-pressed="false">FLAC</button>
             <button data-value="best" aria-pressed="false">Best available</button>
@@ -409,8 +409,8 @@
           <span></span>
         </div>
         <div class="field" id="quality-field">
-          <label>MP3 bitrate</label>
-          <div class="segment" id="quality">
+          <label id="quality-label">MP3 bitrate</label>
+          <div class="segment" id="quality" role="group" aria-labelledby="quality-label">
             <button data-value="128" aria-pressed="false">128</button>
             <button data-value="192" aria-pressed="false">192</button>
             <button data-value="256" aria-pressed="false">256</button>
@@ -429,22 +429,21 @@
         <p class="hint" id="folder-note">Files are named <b>Artist - Title</b>. The folder is created if it does not exist.</p>
         <div class="row row--settings-padding">
           <button class="btn" id="open-folder">Open folder</button>
-          <button class="btn" id="convert">Convert MP3 â†’ FLAC</button>
         </div>
 
         <div class="group-head"><span>Local converters</span><span class="line"></span></div>
         <input class="converter-input" id="media-convert-format" type="hidden" value="mp4">
-        <div class="converter-mode-switch" id="converter-mode" role="tablist" aria-label="Converter type">
-          <button type="button" data-converter-mode="video" role="tab" aria-pressed="true">Video converter</button>
-          <button type="button" data-converter-mode="audio" role="tab" aria-pressed="false">Audio converter</button>
+        <div class="converter-mode-switch" id="converter-mode" role="group" aria-label="Converter type">
+          <button type="button" data-converter-mode="video" aria-pressed="true">Video converter</button>
+          <button type="button" data-converter-mode="audio" aria-pressed="false">Audio converter</button>
         </div>
 
         <div class="converter-panel" id="video-converter-panel" data-converter-panel="video">
           <div class="converter-panel-head"><strong>Video conversion</strong><span>Picture, motion and soundtrack</span></div>
           <div class="converter-grid">
             <div class="converter-control output-format-control">
-              <label>Video output</label>
-              <div class="format-picker" id="video-format-picker" role="radiogroup" aria-label="Video output format">
+              <label id="video-output-label">Video output</label>
+              <div class="format-picker" id="video-format-picker" role="radiogroup" aria-labelledby="video-output-label">
                 <button type="button" data-format="mp4" role="radio" aria-checked="true">MP4</button>
                 <button type="button" data-format="mkv" role="radio" aria-checked="false">MKV</button>
                 <button type="button" data-format="webm" role="radio" aria-checked="false">WebM</button>
@@ -521,10 +520,10 @@
               </select>
             </div>
             <div class="converter-control" id="media-custom-size" hidden>
-              <label>Custom dimensions</label>
-              <div class="dimension-pair">
-                <input class="converter-input" id="media-convert-width" type="number" min="16" max="7680" placeholder="Width">
-                <input class="converter-input" id="media-convert-height" type="number" min="16" max="4320" placeholder="Height">
+              <label id="custom-dimensions-label">Custom dimensions</label>
+              <div class="dimension-pair" role="group" aria-labelledby="custom-dimensions-label">
+                <input class="converter-input" id="media-convert-width" type="number" min="16" max="7680" placeholder="Width" aria-label="Custom width in pixels">
+                <input class="converter-input" id="media-convert-height" type="number" min="16" max="4320" placeholder="Height" aria-label="Custom height in pixels">
               </div>
             </div>
             <p class="hint converter-note">Lanczos/Spline scaling, motion interpolation and picture cleanup are real FFmpeg processing. They improve presentation but cannot recreate missing source detail.</p>
@@ -535,8 +534,8 @@
           <div class="converter-panel-head"><strong>Audio conversion</strong><span>Music, mastering and cleanup</span></div>
           <div class="converter-grid">
             <div class="converter-control output-format-control">
-              <label>Audio output</label>
-              <div class="format-picker" id="audio-format-picker" role="radiogroup" aria-label="Audio output format">
+              <label id="audio-output-label">Audio output</label>
+              <div class="format-picker" id="audio-format-picker" role="radiogroup" aria-labelledby="audio-output-label">
                 <button type="button" data-format="mp3" role="radio" aria-checked="true">MP3</button>
                 <button type="button" data-format="flac" role="radio" aria-checked="false">FLAC</button>
                 <button type="button" data-format="wav" role="radio" aria-checked="false">WAV 24-bit</button>
@@ -603,7 +602,10 @@
         </div>
       </div>
 
-      <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
+      <div class="bar" role="progressbar" aria-label="Download progress"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="bar-fill" id="bar-fill"></div>
+      </div>
       <!-- Where the file is going: the question every download prompts. -->
       <div class="run-path" id="run-path"></div>
       <div class="run-stats">
@@ -652,7 +654,7 @@
     <img src="logo.png" alt="Blue Knight">
     <h2 id="gate-title">Setting up</h2>
     <p id="gate-detail">First launch takes a moment.</p>
-    <div class="gate-bar"></div>
+    <div class="gate-bar" role="progressbar" aria-label="Setting up media components"></div>
     <div class="gate-detail">Fetching FFmpeg and spotDL</div>
     <button class="btn" id="gate-skip" hidden>Continue anyway</button>
   </div>

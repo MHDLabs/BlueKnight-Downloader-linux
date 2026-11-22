@@ -13,7 +13,9 @@ function paintConverter() {
     panel.hidden = panel.dataset.converterPanel !== mode;
   });
   document.querySelectorAll(".format-picker [data-format]").forEach(button => {
-    button.setAttribute("aria-checked", String(button.dataset.format === format));
+    const selected = button.dataset.format === format;
+    button.setAttribute("aria-checked", String(selected));
+    button.tabIndex = selected ? 0 : -1;
   });
   const lossless = ["flac", "wav"].includes(format);
   $("media-custom-size").hidden = $("media-convert-resize").value !== "custom";
@@ -52,6 +54,8 @@ function converterOptions() {
 function toast(message, kind = "info", ms = 5200) {
   const el = document.createElement("div");
   el.className = "toast " + kind;
+  el.setAttribute("role", kind === "err" ? "alert" : "status");
+  el.setAttribute("aria-atomic", "true");
   el.textContent = message;
   $("toasts").appendChild(el);
   setTimeout(() => el.remove(), ms);
@@ -132,10 +136,12 @@ function jobPercent(filePct) {
 }
 
 function setProgress(pct, kind) {
+  const value = Math.max(0, Math.min(100, Number(pct) || 0));
   const fill = $("bar-fill");
-  fill.style.width = Math.max(0, Math.min(100, pct)) + "%";
+  fill.style.width = value + "%";
   fill.className = "bar-fill" + (kind ? " " + kind : "");
-  $("stat-pct").textContent = Math.round(pct) + "%";
+  $("stat-pct").textContent = Math.round(value) + "%";
+  fill.parentElement?.setAttribute("aria-valuenow", String(Math.round(value)));
 }
 
 function refreshStats() {
