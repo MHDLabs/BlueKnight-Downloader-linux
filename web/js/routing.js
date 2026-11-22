@@ -57,7 +57,7 @@ function routeLink(url, { focus = false } = {}) {
   const page = sourceForLink(url);
   if (!page) return false;
   if (document.querySelector(".page.on")?.dataset.page !== page) {
-    closeSheet();
+    closeSheet({ restoreFocus: false });
     show(page);
   }
   const field = document.querySelector(".page.on .paste-row input");
@@ -107,7 +107,7 @@ function paintSignin() {
     // While one login window is open, the others would only collide with it.
     b.disabled = Boolean(state.signin) && !active;
     const note = b.parentElement.querySelector(".signin-note");
-    if (note) note.textContent = saved && saved.signed_in ? "âœ“ " + saved.detail : "";
+    if (note) note.textContent = saved && saved.signed_in ? "✓ " + saved.detail : "";
   });
 }
 
