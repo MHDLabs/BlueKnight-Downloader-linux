@@ -128,6 +128,25 @@ def main() -> int:
 
     css_path = local_file(parser.stylesheets[0], WEB)
     css = css_path.read_text(encoding="utf-8")
+    components = (WEB / "js" / "components.js").read_text(encoding="utf-8")
+
+    if 'role="progressbar"' not in html or 'aria-valuenow="0"' not in html:
+        raise AssertionError("Download progress must expose its initial accessible value")
+    if 'aria-label="Setting up media components"' not in html:
+        raise AssertionError("Setup progress must expose an indeterminate accessible label")
+    if 'setAttribute("aria-valuenow"' not in components:
+        raise AssertionError("Download progress must keep its accessible value in sync")
+
+    required_visual_rules = (
+        "--chrome-surface:",
+        "--chrome-filter:",
+        ".bar::after",
+        "@media (prefers-reduced-transparency: reduce)",
+    )
+    missing_visual_rules = [rule for rule in required_visual_rules if rule not in css]
+    if missing_visual_rules:
+        raise AssertionError(f"Frosted navigation/progress rules missing: {missing_visual_rules!r}")
+
     css_urls = re.findall(r"url\(\s*(['\"]?)(.*?)\1\s*\)", css, re.IGNORECASE)
     for _, reference in css_urls:
         reference = reference.strip()
