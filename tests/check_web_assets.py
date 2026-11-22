@@ -184,10 +184,16 @@ def main() -> int:
         ".bar::after",
         "@media (prefers-reduced-transparency: reduce)",
         ".mbar,",
+        ".nav button:focus-visible",
+        ".format-picker button:focus-visible",
     )
     missing_visual_rules = [rule for rule in required_visual_rules if rule not in css]
     if missing_visual_rules:
         raise AssertionError(f"Frosted navigation/progress rules missing: {missing_visual_rules!r}")
+    if "box-shadow: 0 0 18px color-mix(in srgb, var(--spotify) 24%, transparent);" in css:
+        raise AssertionError("Selected format controls must not use a decorative glow")
+    if "box-shadow: 0 0 8px var(--spotify);" in css:
+        raise AssertionError("Active navigation must not use a decorative glow")
 
     css_urls = re.findall(r"url\(\s*(['\"]?)(.*?)\1\s*\)", css, re.IGNORECASE)
     for _, reference in css_urls:
