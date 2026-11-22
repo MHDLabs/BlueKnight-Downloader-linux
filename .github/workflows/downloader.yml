@@ -17,7 +17,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: downloader-${{ github.ref }}
+  # Isolate each commit so a runner that gets wedged during checkout/setup
+  # cannot hold the single PR concurrency slot and block the corrected build.
+  group: downloader-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
