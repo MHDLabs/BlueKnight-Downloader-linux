@@ -36,6 +36,9 @@ class ReleaseFlavorTests(unittest.TestCase):
         self.assertIn("conclusion == 'success'", self.tag_workflow)
         self.assertIn("TAG_NAME: Blueknightv2.3", self.tag_workflow)
         self.assertIn("git push origin", self.tag_workflow)
+        self.assertIn("GH_TOKEN: ${{ github.token }}", self.tag_workflow)
+        self.assertIn("actions: write", self.tag_workflow)
+        self.assertIn("actions/workflows/downloader.yml/dispatches", self.tag_workflow)
 
     def test_linux_lite_does_not_bundle_native_engines_or_full_sidecars(self):
         self.assertIn('--flavor)', self.linux_build)
