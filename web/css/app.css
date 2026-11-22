@@ -499,7 +499,7 @@ body::before {
   background: var(--ink-3);
   transition: background .16s, box-shadow .16s;
 }
-.nav button.on .dot { background: var(--spotify); box-shadow: 0 0 8px var(--spotify); }
+.nav button.on .dot { background: var(--spotify); }
 .section-icon {
   width: 30px; height: 30px; flex: none;
   display: grid; place-items: center;
@@ -967,7 +967,15 @@ body.busy .status-word { color: var(--spotify); }
   color: #06110b;
   border-color: var(--spotify);
   background: var(--spotify);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--spotify) 24%, transparent);
+}
+/* Keep keyboard navigation visible across the desktop controls. */
+.nav button:focus-visible,
+.wbtn:focus-visible,
+.ghost:focus-visible,
+.converter-mode-switch button:focus-visible,
+.format-picker button:focus-visible {
+  outline: 2px solid var(--spotify);
+  outline-offset: 2px;
 }
 .converter-note {
   grid-column: 1 / -1;
