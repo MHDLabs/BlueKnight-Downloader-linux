@@ -1129,10 +1129,12 @@ class SpotifyDownloader:
                             continue
                         self.log(f"{label} {current} → {latest} available.", "info")
                     else:
-                        self.log(f"{label} is missing. Installing…", "warning")
+                        self.log(f"{label} is not installed; it will be fetched "
+                                 "when its feature is first used.", "info")
+                        continue
 
                     path = self.get_or_download_tool(
-                        name, force=True, version=latest if path else None)
+                        name, force=True, version=latest)
                     after = self.tool_version(path)
                     self._remember_tool(name, path)
                     changed.append(f"{label} {current or 'missing'} → {after}")
@@ -1175,22 +1177,27 @@ class SpotifyDownloader:
                         "Python engine compatibility check failed; keeping every current version: "
                         f"{str(exc)[:180]}", "error")
 
-            try:
-                current_ffmpeg = self.tool_version(self.ffmpeg_cmd) if self.ffmpeg_cmd else "missing"
-                self.log(f"Checking FFmpeg (have {current_ffmpeg})…", "info")
-                updated_ffmpeg = self.get_or_download_ffmpeg(force=True)
-                updated_version = self.tool_version(updated_ffmpeg)
-                self.ffmpeg_cmd = updated_ffmpeg
-                if updated_version != current_ffmpeg:
-                    changed.append(f"FFmpeg {current_ffmpeg} → {updated_version}")
-                    self.log(f"✓ FFmpeg is now {updated_version}", "success")
-                else:
-                    self.log(f"FFmpeg is already current ({current_ffmpeg}).", "success")
-            except Exception as exc:
-                failed.append(f"FFmpeg: {str(exc)[:160]}")
-                self.log(
-                    f"FFmpeg update failed; keeping the working version: {str(exc)[:180]}",
-                    "error")
+            self.ffmpeg_cmd = self.ffmpeg_cmd or self.find_ffmpeg()
+            if not self.ffmpeg_cmd:
+                self.log("FFmpeg is not installed; it will be fetched when a media "
+                         "feature needs it.", "info")
+            else:
+                try:
+                    current_ffmpeg = self.tool_version(self.ffmpeg_cmd)
+                    self.log(f"Checking FFmpeg (have {current_ffmpeg})…", "info")
+                    updated_ffmpeg = self.get_or_download_ffmpeg(force=True)
+                    updated_version = self.tool_version(updated_ffmpeg)
+                    self.ffmpeg_cmd = updated_ffmpeg
+                    if updated_version != current_ffmpeg:
+                        changed.append(f"FFmpeg {current_ffmpeg} → {updated_version}")
+                        self.log(f"✓ FFmpeg is now {updated_version}", "success")
+                    else:
+                        self.log(f"FFmpeg is already current ({current_ffmpeg}).", "success")
+                except Exception as exc:
+                    failed.append(f"FFmpeg: {str(exc)[:160]}")
+                    self.log(
+                        f"FFmpeg update failed; keeping the working version: {str(exc)[:180]}",
+                        "error")
 
             # Instagram needs a login, so a readable cookie jar is a component
             # like any other. Checked here because yt-dlp must exist first.
