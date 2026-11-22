@@ -22,15 +22,15 @@
        on screen belongs to whichever source is open. -->
   <header class="mbar" id="mbar">
     <img class="mbar-mark" src="logo.png" alt="">
-    <button class="mbar-source" id="mbar-source" aria-haspopup="dialog" aria-expanded="false">
+    <button class="mbar-source" id="mbar-source" aria-haspopup="dialog" aria-controls="sheet" aria-expanded="false">
       <span class="mbar-kicker">Source</span>
       <span class="mbar-name"><span class="mbar-icon" id="mbar-icon" aria-hidden="true"></span><span id="mbar-label">Spotify</span></span>
     </button>
     <div class="mbar-eq" aria-hidden="true">
       <div class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></div>
     </div>
-    <button class="mbar-btn" id="mbar-more" aria-haspopup="dialog"
-            aria-label="Choose a source">
+    <button class="mbar-btn" id="mbar-more" aria-haspopup="dialog" aria-controls="sheet"
+            aria-expanded="false" aria-label="Choose a source">
       <span></span><span></span><span></span>
     </button>
   </header>
@@ -429,7 +429,6 @@
         <p class="hint" id="folder-note">Files are named <b>Artist - Title</b>. The folder is created if it does not exist.</p>
         <div class="row row--settings-padding">
           <button class="btn" id="open-folder">Open folder</button>
-          <button class="btn" id="convert">Convert MP3 â†’ FLAC</button>
         </div>
 
         <div class="group-head"><span>Local converters</span><span class="line"></span></div>
