@@ -80,6 +80,10 @@ class ReleaseFlavorTests(unittest.TestCase):
         self.assertIn('if expected_flavor == "lite":', self.app)
         self.assertIn('assert not bundled_tool(_spec["exe"])', self.app)
         self.assertIn('assert not bundled_tool(f"ffprobe{EXE}")', self.app)
+        self.assertIn(
+            '_test_runtime = deno if expected_flavor == "full" else sys.executable',
+            self.app,
+        )
 
 
 if __name__ == "__main__":
