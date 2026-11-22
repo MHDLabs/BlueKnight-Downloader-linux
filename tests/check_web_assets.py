@@ -129,6 +129,26 @@ def main() -> int:
     css_path = local_file(parser.stylesheets[0], WEB)
     css = css_path.read_text(encoding="utf-8")
     components = (WEB / "js" / "components.js").read_text(encoding="utf-8")
+    shell = (WEB / "js" / "shell.js").read_text(encoding="utf-8")
+    routing = (WEB / "js" / "routing.js").read_text(encoding="utf-8")
+
+    ui_text = html + routing
+    if any(marker in ui_text for marker in ("â†", "âœ", "�")):
+        raise AssertionError("The frontend contains visibly corrupted UTF-8 text")
+
+    if 'id="convert"' in html:
+        raise AssertionError("The retired, unhandled MP3-to-FLAC control must not be rendered")
+
+    if 'aria-controls="sheet"' not in html or 'aria-expanded="false"' not in html:
+        raise AssertionError("Mobile menu triggers must expose their controlled dialog state")
+    if 'event.key === "Escape"' not in shell or 'event.key !== "Tab"' not in shell:
+        raise AssertionError("The mobile section dialog must support Escape and trapped Tab navigation")
+    if "sheetFocusables" not in shell or "target.focus()" not in shell:
+        raise AssertionError("The mobile section dialog must manage and restore keyboard focus")
+    if 'closeSheet({ restoreFocus: false })' not in routing:
+        raise AssertionError("Shared-link routing must not steal focus back from its destination field")
+    if 'setAttribute("role", kind === "err" ? "alert" : "status")' not in components:
+        raise AssertionError("Notifications must be announced to assistive technology")
 
     if 'role="progressbar"' not in html or 'aria-valuenow="0"' not in html:
         raise AssertionError("Download progress must expose its initial accessible value")
@@ -142,6 +162,7 @@ def main() -> int:
         "--chrome-filter:",
         ".bar::after",
         "@media (prefers-reduced-transparency: reduce)",
+        ".mbar,",
     )
     missing_visual_rules = [rule for rule in required_visual_rules if rule not in css]
     if missing_visual_rules:
