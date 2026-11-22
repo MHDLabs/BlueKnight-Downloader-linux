@@ -23,6 +23,11 @@ const sources = scripts.map((path) => {
 // which individual node syntax checks cannot detect.
 new Script(sources.join("\n;\n"), { filename: "combined-classic-scripts.js" });
 
+const demoPath = "web/js/demo.js";
+const demoSource = readFileSync(join(root, demoPath), "utf8");
+new Script(demoSource, { filename: demoPath });
+
 console.log("Web JavaScript: OK");
-console.log("  all four scripts parse independently");
+console.log("  all four desktop scripts parse independently");
+console.log("  browser-only demo adapter parses independently");
 console.log("  shared top-level declarations have no collisions");

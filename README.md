@@ -7,6 +7,7 @@ Linux is the primary development and CI target. Windows support and its
 packaging script are retained, but automated Windows builds and smoke tests
 are currently paused.
 
+[Live demo (simulated)](https://mhdlabs.github.io/BlueKnight-Downloader-linux/) ·
 [Releases](https://github.com/MHDLabs/BlueKnight-Downloader-linux/releases) ·
 [Issues](https://github.com/MHDLabs/BlueKnight-Downloader-linux/issues) ·
 [Development guide](DEVELOPING.md) ·
