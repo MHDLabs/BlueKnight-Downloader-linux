@@ -18,6 +18,7 @@ class ReleaseFlavorTests(unittest.TestCase):
         cls.linux_build = (ROOT / "build_portable.sh").read_text("utf-8")
         cls.windows_build = (ROOT / "build_portable.ps1").read_text("utf-8")
         cls.app = (ROOT / "spotify_downloader.py").read_text("utf-8")
+        cls.tag_workflow = (ROOT / ".github/workflows/tag-prerelease-v2.3.yml").read_text("utf-8")
 
     def test_ci_builds_all_three_native_artifacts(self):
         self.assertIn("target: linux-x64, flavor: lite", self.workflow)
@@ -31,6 +32,10 @@ class ReleaseFlavorTests(unittest.TestCase):
     def test_release_is_explicitly_a_prerelease(self):
         self.assertIn("prerelease: true", self.workflow)
         self.assertIn("make_latest: false", self.workflow)
+        self.assertIn('workflows: ["Downloader"]', self.tag_workflow)
+        self.assertIn("conclusion == 'success'", self.tag_workflow)
+        self.assertIn("TAG_NAME: Blueknightv2.3", self.tag_workflow)
+        self.assertIn("git push origin", self.tag_workflow)
 
     def test_linux_lite_does_not_bundle_native_engines_or_full_sidecars(self):
         self.assertIn('--flavor)', self.linux_build)
