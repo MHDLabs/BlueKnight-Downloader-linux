@@ -183,6 +183,10 @@ def main() -> int:
         raise AssertionError("Download progress must keep its accessible value in sync")
 
     required_visual_rules = (
+        "::selection",
+        "caret-color: var(--spotify)",
+        "text-underline-offset:",
+        "user-select: text",
         "--chrome-surface:",
         "--chrome-filter:",
         ".bar::after",
