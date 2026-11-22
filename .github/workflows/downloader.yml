@@ -102,8 +102,54 @@ jobs:
             release/*.tar.gz
           if-no-files-found: error
 
-  release:
+  verify-packages:
     needs: [desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+      - name: Verify all release archives and Lite size
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+          import zipfile
+
+          root = Path("artifacts")
+          def one(name):
+              found = list(root.rglob(name))
+              if len(found) != 1:
+                  raise SystemExit(f"expected one {name}, found {len(found)}")
+              return found[0]
+
+          lite = one("BlueKnightDownloader-linux-x64-lite.tar.gz")
+          full = one("BlueKnightDownloader-linux-x64-full.tar.gz")
+          windows = one("BlueKnightDownloader-windows-x64.zip")
+          for archive in (lite, full):
+              with tarfile.open(archive, "r:gz") as package:
+                  names = set(package.getnames())
+                  if "portable.mode" not in names or "release-flavor.txt" not in names:
+                      raise SystemExit(f"{archive.name} is missing its portable/flavor marker")
+                  marker = package.extractfile("release-flavor.txt").read().decode().strip()
+                  expected = "lite" if archive == lite else "full"
+                  if marker != expected:
+                      raise SystemExit(f"{archive.name} says {marker}, expected {expected}")
+          with zipfile.ZipFile(windows) as package:
+              if "release-flavor.txt" not in package.namelist():
+                  raise SystemExit("Windows package is missing release-flavor.txt")
+              if package.read("release-flavor.txt").decode().strip() != "full":
+                  raise SystemExit("Windows package is not marked Full")
+
+          print(f"Linux Lite: {lite.stat().st_size / 1024 / 1024:.1f} MiB")
+          print(f"Linux Full: {full.stat().st_size / 1024 / 1024:.1f} MiB")
+          print(f"Windows Full: {windows.stat().st_size / 1024 / 1024:.1f} MiB")
+          if lite.stat().st_size >= full.stat().st_size:
+              raise SystemExit("Linux Lite is not smaller than Linux Full")
+          PY
+
+  release:
+    needs: [desktop, verify-packages]
     if: (startsWith(github.ref, 'refs/tags/downloader-v') || startsWith(github.ref, 'refs/tags/Blueknightv'))
     runs-on: ubuntu-latest
     steps:
