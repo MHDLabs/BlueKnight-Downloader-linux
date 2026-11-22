@@ -4304,6 +4304,7 @@ if __name__ == "__main__":
                                     timeout=90)
             # Any answer proves it starts and speaks JSON; which answer depends
             # on the network, which a build must not.
+            assert b"{" in _probe.stdout, _probe.stdout[:200]
 
         # A second engine answers a site. It cannot answer a full disk, a
         # read-only folder, or someone pressing stop — and trying buries the
