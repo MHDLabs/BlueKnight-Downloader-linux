@@ -1,18 +1,12 @@
-# Blue Knight Downloader — Linux-first desktop package. Windows CI is paused.
+# Blue Knight Downloader — Linux Lite, Linux Full and Windows Full releases.
 #
-# PyInstaller packages are built on their native runners. Linux is the only
-# active CI target right now; the Windows packaging script remains available.
-#
-# The repository at the root holds a second, unrelated app (White Booster) with
-# its own release.yml on the "v*" tags. This one answers to "downloader-v*" so
-# the two never fire on each other's releases.
+# Every desktop package is built on its native runner. Lite and Full share the
+# same application; Lite downloads bulky native engines only when required.
 name: Downloader
 
 on:
   push:
     branches: [blue-knight-net, main, "refactor/**"]
-    # Two names for the same thing: this repository tags its releases
-    # "Blueknightv2.1"; the monorepo it is synced from uses "downloader-v*".
     tags: ["downloader-v*", "Blueknightv*"]
     paths: ["**", "!README.md"]
   pull_request:
@@ -23,13 +17,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: downloader-${{ github.ref }}
+  # Isolate each commit so a runner that gets wedged during checkout/setup
+  # cannot hold the single PR concurrency slot and block the corrected build.
+  group: downloader-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
-  # --------------------------------------------------------------------------
-  # The engine's own checks, once, before the platform runners package it.
-  # --------------------------------------------------------------------------
   check:
     runs-on: ubuntu-latest
     steps:
@@ -37,7 +30,6 @@ jobs:
       - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
       - name: Path and platform checks
-
         run: |
           python blueknight_paths.py
           python pyshell.py
@@ -48,7 +40,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-24.04,     target: linux-x64 }
+          - { os: ubuntu-24.04, target: linux-x64, flavor: lite }
+          - { os: ubuntu-24.04, target: linux-x64, flavor: full }
+          - { os: windows-2022, target: windows-x64, flavor: full }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -56,28 +50,18 @@ jobs:
       - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
 
-      # The desktop's second YouTube engine is a .NET sidecar. The build
-      # scripts skip it when no SDK is present, so without this the packages
-      # would still build and quietly ship one engine short.
+      # Full builds include the .NET and JVM fallback engines. Lite skips both.
       - uses: actions/setup-dotnet@v6
         with: { dotnet-version: "8.0.x" }
 
-      # The NewPipe engine is a JVM library, so the desktop carries a helper
-      # and a runtime trimmed with jlink. Without a JDK the build skips it and
-      # would ship one engine short without saying so.
       - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: "17" }
 
       - name: Install Python dependencies
-
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
-      # pywebview draws through WebKitGTK on Linux and fails at import without
-      # it. The Windows packaging script is retained, but its CI job is paused.
-      # Install the Python dependencies first: after PYTHONPATH is exported,
-      # pip would otherwise see Ubuntu's protected system copy of itself.
       - name: Install WebKitGTK
         if: startsWith(matrix.os, 'ubuntu')
         run: |
@@ -85,33 +69,89 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             python3-gi python3-gi-cairo gir1.2-webkit2-4.1 \
             libcairo2-dev libgirepository1.0-dev pkg-config
-          # setup-python is installed under /opt and does not automatically
-          # see Ubuntu's ABI-compatible python3-gi package. Expose that package
-          # both to the build-time probe and to PyInstaller's import analysis.
           echo "PYTHONPATH=/usr/lib/python3/dist-packages" >> "$GITHUB_ENV"
 
-      - name: Build (Linux)
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Build Linux package
         if: startsWith(matrix.os, 'ubuntu')
+        run: bash ./build_portable.sh --flavor "${{ matrix.flavor }}"
 
-        run: bash ./build_portable.sh
-
-      # A binary that cannot start is not a build. Run the frozen executable,
-      # not the source interpreter, so missing PyInstaller data is caught.
-      - name: Smoke test the Linux package
+      - name: Smoke test Linux package
         if: startsWith(matrix.os, 'ubuntu')
-
+        env:
+          BLUEKNIGHT_EXPECT_FLAVOR: ${{ matrix.flavor }}
         run: ./release/BlueKnightDownloader --self-test
+
+      - name: Build Windows package
+        if: startsWith(matrix.os, 'windows')
+        shell: pwsh
+        run: .\build_portable.ps1
+
+      - name: Smoke test Windows package
+        if: startsWith(matrix.os, 'windows')
+        shell: pwsh
+        env:
+          BLUEKNIGHT_EXPECT_FLAVOR: ${{ matrix.flavor }}
+        run: .\release\BlueKnightDownloader.exe --self-test
 
       - uses: actions/upload-artifact@v6
         with:
-          name: blueknight-${{ matrix.target }}
+          name: blueknight-${{ matrix.target }}-${{ matrix.flavor }}
           path: |
             release/*.zip
             release/*.tar.gz
           if-no-files-found: error
 
-  release:
+  verify-packages:
     needs: [desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+      - name: Verify all release archives and Lite size
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tarfile
+          import zipfile
+
+          root = Path("artifacts")
+          def one(name):
+              found = list(root.rglob(name))
+              if len(found) != 1:
+                  raise SystemExit(f"expected one {name}, found {len(found)}")
+              return found[0]
+
+          lite = one("BlueKnightDownloader-linux-x64-lite.tar.gz")
+          full = one("BlueKnightDownloader-linux-x64-full.tar.gz")
+          windows = one("BlueKnightDownloader-windows-x64.zip")
+          for archive in (lite, full):
+              with tarfile.open(archive, "r:gz") as package:
+                  names = set(package.getnames())
+                  if "portable.mode" not in names or "release-flavor.txt" not in names:
+                      raise SystemExit(f"{archive.name} is missing its portable/flavor marker")
+                  marker = package.extractfile("release-flavor.txt").read().decode().strip()
+                  expected = "lite" if archive == lite else "full"
+                  if marker != expected:
+                      raise SystemExit(f"{archive.name} says {marker}, expected {expected}")
+          with zipfile.ZipFile(windows) as package:
+              if "release-flavor.txt" not in package.namelist():
+                  raise SystemExit("Windows package is missing release-flavor.txt")
+              if package.read("release-flavor.txt").decode().strip() != "full":
+                  raise SystemExit("Windows package is not marked Full")
+
+          print(f"Linux Lite: {lite.stat().st_size / 1024 / 1024:.1f} MiB")
+          print(f"Linux Full: {full.stat().st_size / 1024 / 1024:.1f} MiB")
+          print(f"Windows Full: {windows.stat().st_size / 1024 / 1024:.1f} MiB")
+          if lite.stat().st_size >= full.stat().st_size:
+              raise SystemExit("Linux Lite is not smaller than Linux Full")
+          PY
+
+  release:
+    needs: [desktop, verify-packages]
     if: (startsWith(github.ref, 'refs/tags/downloader-v') || startsWith(github.ref, 'refs/tags/Blueknightv'))
     runs-on: ubuntu-latest
     steps:
@@ -125,3 +165,5 @@ jobs:
             artifacts/*.zip
             artifacts/*.tar.gz
           generate_release_notes: true
+          prerelease: true
+          make_latest: false

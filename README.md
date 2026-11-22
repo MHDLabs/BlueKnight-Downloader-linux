@@ -1,11 +1,11 @@
 # Blue Knight Downloader
 
 A portable desktop downloader for Linux and Windows, built around a local
-WebView interface and a Python engine.
+WebView interface and a shared Python engine.
 
-Linux is the primary development and CI target. Windows support and its
-packaging script are retained, but automated Windows builds and smoke tests
-are currently paused.
+Official releases provide Linux Lite, Linux Full and Windows Full packages.
+The Lite package keeps large native engines out of the initial download and
+installs them only when a selected feature needs them.
 
 [Live demo (simulated)](https://mhdlabs.github.io/BlueKnight-Downloader-linux/) ·
 [Releases](https://github.com/MHDLabs/BlueKnight-Downloader-linux/releases) ·
@@ -96,12 +96,22 @@ installed for workflows that need them.
 ### Linux
 
 1. Open the repository's [Releases](https://github.com/MHDLabs/BlueKnight-Downloader-linux/releases).
-2. Download the Linux x64 TAR.GZ package.
+2. Choose one of the Linux x64 archives:
+   - **Lite:** `BlueKnightDownloader-linux-x64-lite.tar.gz` — smaller initial download; native tools are fetched as needed.
+   - **Full:** `BlueKnightDownloader-linux-x64-full.tar.gz` — native tools and desktop fallbacks are included.
 3. Extract the complete archive into a writable directory.
-4. Make sure WebKitGTK 4.1 and the required GTK runtime libraries are installed.
-5. Run the BlueKnightDownloader executable from the extracted directory.
+4. Install WebKitGTK 4.1 and the required GTK runtime libraries.
+5. Run `./BlueKnightDownloader` from the extracted directory.
 
-The Linux package does not bundle a complete WebKitGTK browser runtime.
+Lite and Full share the same main application and download workflows.
+Lite excludes the optional .NET and JVM fallback helpers, so a few sources may
+have fewer fallback routes when the primary extractor cannot handle them. Lite
+stores downloaded native engines under the app's portable data directory and
+never installs them globally or asks for administrator privileges. If a feature
+needs a missing engine, the app downloads it at that point. Full is preferable
+for offline setup and maximum fallback coverage.
+
+Neither Linux package bundles the complete WebKitGTK browser runtime.
 WebKitGTK 4.1 must be provided by the host distribution.
 
 Package dependencies on common distributions:
@@ -114,9 +124,10 @@ Package names may vary by distribution release.
 
 ### Windows
 
-The Windows build script is retained at `build_portable.ps1`, but its automated
-CI build and smoke test are paused. Windows packaging should therefore be
-treated as requiring manual verification until Windows CI is restored.
+Download `BlueKnightDownloader-windows-x64.zip` from Releases. It is the Full
+package and includes the native engines and available desktop fallback helpers.
+Extract the archive and run `BlueKnightDownloader.exe`. Microsoft Edge
+WebView2 Runtime must be available on the system.
 
 ---
 
@@ -168,11 +179,18 @@ with a DRM or access-control bypass.
 The repository contains the desktop engine, UI assets, helper projects and
 packaging scripts.
 
-Linux:
+Linux Lite:
 
 ~~~bash
 python3 -m pip install -r requirements.txt
-bash ./build_portable.sh
+bash ./build_portable.sh --flavor lite
+~~~
+
+Linux Full:
+
+~~~bash
+python3 -m pip install -r requirements.txt
+bash ./build_portable.sh --flavor full
 ~~~
 
 Windows:
@@ -186,9 +204,14 @@ The Linux build requires WebKitGTK 4.1 development libraries. The NewPipe and
 YoutubeExplode helpers use Java 17 and .NET 8 respectively; install those SDKs
 when building a package that should include both helpers.
 
-The build scripts place distributable packages under `release/`. CI currently
-builds and smoke-tests Linux x64. The Windows packaging script remains
-available, but its CI job is paused.
+The build scripts place distributable packages under `release/`:
+
+- `BlueKnightDownloader-linux-x64-lite.tar.gz`
+- `BlueKnightDownloader-linux-x64-full.tar.gz`
+- `BlueKnightDownloader-windows-x64.zip`
+
+CI builds and smoke-tests all three packages on their native operating-system
+runners. Release tags publish these artifacts as a GitHub Pre-release.
 
 ### Tests
 

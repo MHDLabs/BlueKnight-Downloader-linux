@@ -9,6 +9,7 @@ $Ffmpeg = Join-Path $Vendor "ffmpeg.exe"
 $Ffprobe = Join-Path $Vendor "ffprobe.exe"
 $Output = Join-Path $Root "release"
 $Work = Join-Path $Root "build"
+$FlavorMarker = Join-Path $Output "release-flavor.txt"
 $PythonRoot = python -c "import sys; print(sys.base_prefix)"
 $PythonDlls = Join-Path $PythonRoot "DLLs"
 $PythonLib = Join-Path $PythonRoot "Lib"
@@ -20,10 +21,16 @@ $YtjsVersion = "18.0.0"
 # Extra PyInstaller arguments that only exist when their file does.
 $ExtraArgs = @()
 
+# Windows is the full flavor: all native engines and fallbacks ship together.
+# Keep old build outputs out of the new archive.
+if (Test-Path -LiteralPath $Output) { Remove-Item -LiteralPath $Output -Recurse -Force }
+if (Test-Path -LiteralPath $Work) { Remove-Item -LiteralPath $Work -Recurse -Force }
+New-Item -ItemType Directory -Force -Path $Vendor, $Output, $Work | Out-Null
+Set-Content -LiteralPath $FlavorMarker -Value "full" -Encoding ascii
+
 # vendor/ is deliberately not in the repository: it is 200 MB of other
 # projects' release binaries. Fetching what is missing is what makes a fresh
 # clone — and a CI runner — able to build without a manual setup step.
-New-Item -ItemType Directory -Force -Path $Vendor | Out-Null
 
 function Get-Tool {
     param([string]$Url, [string]$Destination)
@@ -155,6 +162,7 @@ python -m PyInstaller --noconfirm --clean --windowed --onefile `
     --runtime-hook (Join-Path $Root "pyi_tk_runtime_hook.py") `
     --add-data "$(Join-Path $Root 'web');web" `
     --add-data "$(Join-Path $Root 'assets');assets" `
+    --add-data "$FlavorMarker;." `
     --add-data "$(Join-Path $PythonLib 'tkinter');tkinter" `
     --add-data "$(Join-Path $PythonTcl 'tcl8.6');_tcl_data" `
     --add-data "$(Join-Path $PythonTcl 'tk8.6');_tk_data" `
@@ -182,6 +190,7 @@ $Package = Join-Path $Dist "BlueKnightDownloader-windows-x64.zip"
 $PackageItems = @(
     $Executable,
     $PortableMarker,
+    $FlavorMarker,
     (Join-Path $Dist "README.md"),
     (Join-Path $Dist "THIRD_PARTY_NOTICES.txt"),
     (Join-Path $Dist "LICENSE")

@@ -58,6 +58,23 @@ import webview
 APP_NAME = "Blue Knight Downloader"
 APP_VERSION = "7.9.0"
 CREATOR = "Blue Knight"
+
+
+def packaged_build_flavor():
+    """Read the flavor marker embedded in official desktop builds."""
+    roots = [Path(getattr(sys, "_MEIPASS", "")),
+             Path(__file__).resolve().parent]
+    for root in roots:
+        try:
+            value = (root / "release-flavor.txt").read_text("utf-8").strip().lower()
+        except OSError:
+            continue
+        if value in {"lite", "full"}:
+            return value
+    return "source"
+
+
+BUILD_FLAVOR = packaged_build_flavor()
 TELEGRAM_URL = "https://t.me/BlueKnight_Net"
 
 from blueknight.engines.wheels import select_compatible_wheel
@@ -871,7 +888,7 @@ class SpotifyDownloader:
         return self.network.test_proxy()
 
     # ------------------------------------------------------------------
-    # Setup (unchanged)
+    # Setup and on-demand component installation
     # ------------------------------------------------------------------
     def start_automatic_setup(self):
         if self.setup_running:
@@ -880,59 +897,43 @@ class SpotifyDownloader:
         threading.Thread(target=self.setup_dependencies, daemon=True).start()
 
     def setup_dependencies(self):
+        """Discover local components only. Startup must never download tools."""
         try:
-            self.ui("setup", "Checking FFmpeg...", "This is required for audio conversion")
-            self.ffmpeg_cmd = self.get_or_download_ffmpeg()
-            
-            if not self.ffmpeg_cmd:
-                raise RuntimeError("Failed to setup FFmpeg")
-
-            self.ui("setup", "Checking spotDL...", "This downloads Spotify tracks")
-            self.spotdl_cmd = self.get_or_download_tool("spotdl")
-            if not self.spotdl_cmd:
-                raise RuntimeError("spotDL was installed, but its command could not be located.")
-
-            self.ui("setup", "Checking yt-dlp...", "This downloads YouTube, TikTok, Instagram and video-site media")
-            self.ytdlp_cmd = self.get_or_download_tool("yt-dlp")
-            if not self.ytdlp_cmd:
-                raise RuntimeError("yt-dlp was installed, but its command could not be located.")
-
-            self.ui("setup", "Checking YouTube challenge runtime...",
-                    "Deno runs yt-dlp's bundled EJS challenge solver")
-            self.deno_cmd = self.get_or_download_tool("deno")
-            if not self.deno_cmd:
-                raise RuntimeError("Deno was installed, but its command could not be located.")
-
-            self.ui("setup", "Checking fallback engines...",
-                    "This adds live streams, HTML galleries and mixed media")
+            self.ui("setup", "Checking installed components...",
+                    "Optional download engines are installed when their feature is first used.")
+            self.ffmpeg_cmd = self.find_ffmpeg()
+            self.spotdl_cmd = self.find_tool("spotdl")
+            self.ytdlp_cmd = self.find_tool("yt-dlp")
+            self.deno_cmd = self.find_tool("deno")
             try:
                 import gallery_dl
+                self.gallerydl_version = getattr(gallery_dl, "__version__", "installed")
+            except ImportError:
+                self.gallerydl_version = None
+            try:
                 import streamlink
-                self.gallerydl_version = gallery_dl.__version__
-                self.streamlink_version = streamlink.__version__
-            except ImportError as exc:
-                raise RuntimeError(f"A bundled fallback engine is missing: {exc.name}") from exc
-
-            self.ui("setup_done", "Ready to download", "Everything is installed and up to date.")
+                self.streamlink_version = getattr(streamlink, "__version__", "installed")
+            except ImportError:
+                self.streamlink_version = None
+            self.ui("setup_done", "Ready to download",
+                    "Missing tools will be downloaded only when a feature needs them.")
             self.ui("components", self.component_summary())
-            self.log("✓ FFmpeg: " + str(self.ffmpeg_cmd), "success")
-            self.log("✓ spotDL: " + str(self.spotdl_cmd), "success")
-            self.log("✓ yt-dlp: " + str(self.ytdlp_cmd), "success")
-            # Report the runtime yt-dlp will actually use for JavaScript challenges.
+            for label, path in (
+                    ("FFmpeg", self.ffmpeg_cmd), ("spotDL", self.spotdl_cmd),
+                    ("yt-dlp", self.ytdlp_cmd), ("Deno", self.deno_cmd)):
+                if path:
+                    self.log(f"✓ {label}: {path}", "success")
+                else:
+                    self.log(f"○ {label}: not installed; available on first use", "info")
             runtime_name, runtime_path = self.js_runtime()
             if runtime_name:
-                self.log(f"✓ JS runtime: {runtime_name} ({runtime_path})", "success")
+                self.log(f"✓ JavaScript runtime: {runtime_name} ({runtime_path})", "success")
             else:
-                self.log("✗ No JavaScript runtime. YouTube needs one to unscramble "
-                         "its media links; without it most formats are dropped and "
-                         "downloads fail with 'Requested format is not available'.",
-                         "error")
-            self.log(f"✓ gallery-dl: {self.gallerydl_version}", "success")
-            self.log(f"✓ Streamlink: {self.streamlink_version}", "success")
+                self.log("○ JavaScript challenge runtime: Deno will be installed "
+                         "when a YouTube download needs it.", "info")
             self.log("💡 Use 'V2RayN HTTP' preset for proxy support", "info")
-
         except Exception as exc:
-            self.ui("setup_error", "Automatic setup needs attention", str(exc))
+            self.ui("setup_error", "Component check needs attention", str(exc))
         finally:
             self.setup_running = False
 
@@ -1128,10 +1129,12 @@ class SpotifyDownloader:
                             continue
                         self.log(f"{label} {current} → {latest} available.", "info")
                     else:
-                        self.log(f"{label} is missing. Installing…", "warning")
+                        self.log(f"{label} is not installed; it will be fetched "
+                                 "when its feature is first used.", "info")
+                        continue
 
                     path = self.get_or_download_tool(
-                        name, force=True, version=latest if path else None)
+                        name, force=True, version=latest)
                     after = self.tool_version(path)
                     self._remember_tool(name, path)
                     changed.append(f"{label} {current or 'missing'} → {after}")
@@ -1174,22 +1177,27 @@ class SpotifyDownloader:
                         "Python engine compatibility check failed; keeping every current version: "
                         f"{str(exc)[:180]}", "error")
 
-            try:
-                current_ffmpeg = self.tool_version(self.ffmpeg_cmd) if self.ffmpeg_cmd else "missing"
-                self.log(f"Checking FFmpeg (have {current_ffmpeg})…", "info")
-                updated_ffmpeg = self.get_or_download_ffmpeg(force=True)
-                updated_version = self.tool_version(updated_ffmpeg)
-                self.ffmpeg_cmd = updated_ffmpeg
-                if updated_version != current_ffmpeg:
-                    changed.append(f"FFmpeg {current_ffmpeg} → {updated_version}")
-                    self.log(f"✓ FFmpeg is now {updated_version}", "success")
-                else:
-                    self.log(f"FFmpeg is already current ({current_ffmpeg}).", "success")
-            except Exception as exc:
-                failed.append(f"FFmpeg: {str(exc)[:160]}")
-                self.log(
-                    f"FFmpeg update failed; keeping the working version: {str(exc)[:180]}",
-                    "error")
+            self.ffmpeg_cmd = self.ffmpeg_cmd or self.find_ffmpeg()
+            if not self.ffmpeg_cmd:
+                self.log("FFmpeg is not installed; it will be fetched when a media "
+                         "feature needs it.", "info")
+            else:
+                try:
+                    current_ffmpeg = self.tool_version(self.ffmpeg_cmd)
+                    self.log(f"Checking FFmpeg (have {current_ffmpeg})…", "info")
+                    updated_ffmpeg = self.get_or_download_ffmpeg(force=True)
+                    updated_version = self.tool_version(updated_ffmpeg)
+                    self.ffmpeg_cmd = updated_ffmpeg
+                    if updated_version != current_ffmpeg:
+                        changed.append(f"FFmpeg {current_ffmpeg} → {updated_version}")
+                        self.log(f"✓ FFmpeg is now {updated_version}", "success")
+                    else:
+                        self.log(f"FFmpeg is already current ({current_ffmpeg}).", "success")
+                except Exception as exc:
+                    failed.append(f"FFmpeg: {str(exc)[:160]}")
+                    self.log(
+                        f"FFmpeg update failed; keeping the working version: {str(exc)[:180]}",
+                        "error")
 
             # Instagram needs a login, so a readable cookie jar is a component
             # like any other. Checked here because yt-dlp must exist first.
@@ -1250,18 +1258,82 @@ class SpotifyDownloader:
         elif name == "deno":
             self.deno_cmd = path
 
+    def ensure_tool(self, name):
+        """Find or install one native engine when its feature first needs it."""
+        if self.updating:
+            raise RuntimeError("Components are being updated. Try again when they finish.")
+        current = {
+            "spotdl": self.spotdl_cmd, "yt-dlp": self.ytdlp_cmd,
+            "deno": self.deno_cmd,
+        }.get(name)
+        path = current or self.find_tool(name)
+        if not path:
+            label = TOOLS[name]["label"]
+            self.ui("setup", f"Installing {label}...",
+                    "This component is downloaded only for the feature you selected.")
+            path = self.get_or_download_tool(name)
+        if not path:
+            raise RuntimeError(f"{TOOLS[name]['label']} could not be installed or located.")
+        self._remember_tool(name, path)
+        self.ui("components", self.component_summary())
+        return path
+
+    def find_ffmpeg(self):
+        """Discover FFmpeg without network access or modifying the system."""
+        if (self._is_native_executable(self.ffmpeg_exe)
+                and self.tool_version(self.ffmpeg_exe) != "unknown"):
+            return str(self.ffmpeg_exe)
+        packaged_ffmpeg = bundled_tool(f"ffmpeg{EXE}")
+        if packaged_ffmpeg:
+            return packaged_ffmpeg
+        system_ffmpeg = shutil.which("ffmpeg")
+        if system_ffmpeg:
+            return system_ffmpeg
+        try:
+            import imageio_ffmpeg
+            binary = imageio_ffmpeg.get_ffmpeg_exe()
+            if binary and Path(binary).exists():
+                return binary
+        except Exception:
+            pass
+        return None
+
+    def ensure_ffmpeg(self):
+        """Find or install FFmpeg for a feature that actually needs it."""
+        if self.updating:
+            raise RuntimeError("Components are being updated. Try again when they finish.")
+        path = self.ffmpeg_cmd or self.find_ffmpeg()
+        if not path:
+            self.ui("setup", "Installing FFmpeg...",
+                    "FFmpeg is needed for merging, audio extraction and conversion.")
+            path = self.get_or_download_ffmpeg()
+        if not path:
+            raise RuntimeError("FFmpeg could not be installed or located.")
+        self.ffmpeg_cmd = path
+        self.ui("components", self.component_summary())
+        return path
+
+    def ensure_media_engines(self, kind):
+        """Install only the engines required to start this media workflow."""
+        self.ensure_tool("yt-dlp")
+        self.ensure_ffmpeg()
+        if kind in YOUTUBE_KINDS and not self.deno_cmd:
+            # The bundled YouTube.js and PO-token fallbacks explicitly run on Deno.
+            self.ensure_tool("deno")
+
     def component_summary(self):
         python_versions = {
-            name: self.python_engine_version(spec["module"]) or "bundled"
+            name: self.python_engine_version(spec["module"]) or "not installed"
             for name, spec in PYTHON_COMPONENTS.items()
         }
         pdf_label = PYTHON_COMPONENTS[PDF_LIBRARY]["label"]
         desktop_converters = (
             f"\nOffice converter: {self._converter_program('soffice') or 'LibreOffice not found'}"
             f"\nEbook converter: {self._converter_program('ebook-convert') or 'Calibre not found'}")
-        return (f"Spotify engine: {self.spotdl_cmd}\n"
-                f"yt-dlp: {self.ytdlp_cmd}\n"
-                f"Deno/EJS: {self.deno_cmd}\n"
+        return (f"Build flavor: {BUILD_FLAVOR}\n"
+                f"Spotify engine: {self.spotdl_cmd or 'not installed (on first use)'}\n"
+                f"yt-dlp: {self.ytdlp_cmd or 'not installed (on first use)'}\n"
+                f"Deno/EJS: {self.deno_cmd or 'not installed (when required)'}\n"
                 f"gallery-dl: {python_versions['gallery-dl']}\n"
                 f"Streamlink: {python_versions['streamlink']}\n"
                 f"img2pdf: {python_versions['img2pdf']}\n"
@@ -1272,26 +1344,11 @@ class SpotifyDownloader:
                 f"{desktop_converters}")
 
     def get_or_download_ffmpeg(self, force=False):
-        """Return FFmpeg, staging and launching updates before activation."""
+        """Return a usable FFmpeg, downloading it only when explicitly needed."""
         if not force:
-            # A successfully updated copy must win over the bundled baseline.
-            if (self._is_native_executable(self.ffmpeg_exe)
-                    and self.tool_version(self.ffmpeg_exe) != "unknown"):
-                return str(self.ffmpeg_exe)
-            packaged_ffmpeg = bundled_tool(f"ffmpeg{EXE}")
-            if packaged_ffmpeg:
-                return packaged_ffmpeg
-            system_ffmpeg = shutil.which("ffmpeg")
-            if system_ffmpeg:
-                return system_ffmpeg
-            try:
-                import imageio_ffmpeg
-                binary = imageio_ffmpeg.get_ffmpeg_exe()
-                if binary and Path(binary).exists():
-                    return binary
-            except Exception:
-                pass
-
+            existing = self.find_ffmpeg()
+            if existing:
+                return existing
         return self.ffmpeg_installer.install()
 
     def bgutil_args(self):
@@ -1409,7 +1466,7 @@ class SpotifyDownloader:
         if quality:
             self.quality.set(quality)
 
-        if self.updating or self.setup_running or not self.spotdl_cmd:
+        if self.updating or self.setup_running:
             self.notify("Still finishing setup. Try again in a moment.", "err")
             self.ui("finished")
             return
@@ -1448,7 +1505,17 @@ class SpotifyDownloader:
         return self.network.prepare_for_spotdl(proxy_url, proxy_type)
 
     def download_with_spotdl(self, url, output, options):
-        """Optimized download with proxy support"""
+        """Optimized download with on-demand engine setup and proxy support."""
+        try:
+            self.ensure_tool("spotdl")
+            self.ensure_ffmpeg()
+        except Exception as exc:
+            self.log(f"Spotify components are unavailable: {str(exc)[:220]}", "error")
+            self.ui("failure", f"Could not prepare Spotify download: {str(exc)[:220]}")
+            self.download_finished()
+            self.ui("status", "Ready")
+            self.ui("finished")
+            return
         fmt = options["format"]
         output_template = output / "{artists} - {title}.{output-ext}"
         cmd = [self.spotdl_cmd, "download", url, "--output", str(output_template)]
@@ -1610,7 +1677,7 @@ class SpotifyDownloader:
     def start_media_download(self, kind, url, quality="best", audio_only=False, limit=None):
         if self.is_downloading:
             return
-        if self.updating or not self.ytdlp_cmd or not self.ffmpeg_cmd:
+        if self.updating or self.setup_running:
             self.notify("Still finishing setup. Try again in a moment.", "err")
             self.ui("finished")
             return
@@ -2861,6 +2928,15 @@ class SpotifyDownloader:
         return cmd
 
     def download_with_ytdlp(self, kind, url, output, quality, audio_only, limit):
+        try:
+            self.ensure_media_engines(kind)
+        except Exception as exc:
+            self.log(f"Media components are unavailable: {str(exc)[:220]}", "error")
+            self.ui("failure", f"Could not prepare this download: {str(exc)[:220]}")
+            self.download_finished()
+            self.ui("status", "Ready")
+            self.ui("finished")
+            return
         self.sync_proxy_env()
         self._warned_split_route = False
         self._refused_clients = set()
@@ -3531,28 +3607,16 @@ class SpotifyDownloader:
         if self.updating:
             self.notify("The component update is still running.", "err")
             return
-        self.log("Checking components...", "info")
-
-        if (self._is_windows_executable(self.ffmpeg_exe)
-                and self.tool_version(self.ffmpeg_exe) != "unknown"):
-            self.ffmpeg_cmd = str(self.ffmpeg_exe)
-        else:
-            self.ffmpeg_cmd = bundled_tool(f"ffmpeg{EXE}") or shutil.which("ffmpeg")
-
+        self.log("Checking locally available components...", "info")
+        self.ffmpeg_cmd = self.find_ffmpeg()
         self.spotdl_cmd = self.find_tool("spotdl")
         self.ytdlp_cmd = self.find_tool("yt-dlp")
         self.deno_cmd = self.find_tool("deno")
-
-        required = [("Spotify engine", self.spotdl_cmd), ("yt-dlp", self.ytdlp_cmd),
-                    ("FFmpeg", self.ffmpeg_cmd), ("Deno", self.deno_cmd)]
-        missing = [label for label, found in required if not found]
         self.ui("components", self.component_summary())
-        if not missing:
-            self.status.set("Ready")
-            self.log("All components ready.", "success")
-            self.notify("Everything is installed and ready.", "ok")
-        else:
-            self.notify("Missing: " + ", ".join(missing) + ". Run Check for updates, or restart the app.", "err")
+        self.status.set("Ready")
+        self.log("Local component check completed. Missing engines will be installed "
+                 "only when their feature is used.", "success")
+        self.notify("Component check completed. Optional engines install on demand.", "ok")
 
     # ------------------------------------------------------------------
     # Conversion
@@ -3721,8 +3785,7 @@ class SpotifyDownloader:
         output_format = options["format"]
         self.ui("converting", True, "media")
         try:
-            if not self.ffmpeg_cmd or not Path(self.ffmpeg_cmd).is_file():
-                raise RuntimeError("FFmpeg is not ready. Run Check setup first.")
+            self.ensure_ffmpeg()
             if not source.is_file():
                 raise RuntimeError("The selected media file no longer exists.")
             target_parent = source.parent
@@ -4073,9 +4136,8 @@ class Api:
             f"{TELEGRAM_URL}\n\n"
             "Spotify, YouTube, YouTube Music, TikTok, Instagram, SoundCloud, X,\n"
             "documents, ebooks, manga/manhwa and general video sites.\n"
-            "FFmpeg, spotDL, yt-dlp, Deno, Streamlink and gallery-dl ship inside the app.\n"
-            "The core command-line tools update from\n"
-            "mirrored sources. V2RayN compatible.",
+            "Linux Lite installs large engines when a feature needs them;\n"
+            "Linux Full and Windows include the full engine set. V2RayN compatible.",
             "info",
         )
 
@@ -4087,9 +4149,6 @@ class Api:
             self._app.ui("folder", folder)
 
     def convert_media(self, options):
-        if not self._app.ffmpeg_cmd:
-            self._app.notify("FFmpeg is not ready yet.", "err")
-            return
         picked = self._window.create_file_dialog(
             webview.OPEN_DIALOG,
             file_types=(
@@ -4155,17 +4214,38 @@ if __name__ == "__main__":
             raise SystemExit(4)
         raise SystemExit(0 if validate_engine_update(_probe_paths) else 4)
     elif "--self-test" in sys.argv:
+        expected_flavor = os.environ.get(
+            "BLUEKNIGHT_EXPECT_FLAVOR",
+            BUILD_FLAVOR if BUILD_FLAVOR in {"lite", "full"} else "full",
+        ).strip().lower()
+        if expected_flavor not in {"lite", "full"}:
+            raise SystemExit(2)
+        marker = bundled_tool("release-flavor.txt") if getattr(sys, "frozen", False) else None
+        if marker and Path(marker).read_text("utf-8").strip().lower() != expected_flavor:
+            raise SystemExit(2)
+
         spotdl = bundled_tool(f"spotdl{EXE}")
         ffmpeg = bundled_tool(f"ffmpeg{EXE}")
         ytdlp = bundled_tool(f"yt-dlp{EXE}")
         deno = bundled_tool(f"deno{EXE}")
-        if not ffmpeg:
-            local_ffmpeg = app_data_dir() / "ffmpeg" / "bin" / f"ffmpeg{EXE}"
-            ffmpeg = str(local_ffmpeg) if local_ffmpeg.is_file() else None
-        # Only the tools this platform actually has a build of are required.
-        if not ffmpeg or not ytdlp or ("spotdl" in TOOLS and not spotdl) or (
-                "deno" in TOOLS and not deno):
-            raise SystemExit(2)
+        if expected_flavor == "lite":
+            # A Lite archive must not quietly inherit old vendor files.
+            if any((spotdl, ffmpeg, ytdlp, deno,
+                    bundled_tool(f"blueknight-youtube{EXE}"),
+                    bundled_tool("blueknight-newpipe.jar"),
+                    bundled_tool(f"jre/bin/java{EXE}"))):
+                raise SystemExit(2)
+            # Helper methods below need path-shaped command values, but this
+            # branch deliberately never executes the external commands.
+            spotdl, ffmpeg, ytdlp, deno = "spotdl", "ffmpeg", "yt-dlp", "deno"
+        else:
+            if not ffmpeg:
+                local_ffmpeg = app_data_dir() / "ffmpeg" / "bin" / f"ffmpeg{EXE}"
+                ffmpeg = str(local_ffmpeg) if local_ffmpeg.is_file() else None
+            # Full releases carry the primary native engines.
+            if not ffmpeg or not ytdlp or ("spotdl" in TOOLS and not spotdl) or (
+                    "deno" in TOOLS and not deno):
+                raise SystemExit(2)
         # --ffmpeg-location must name something yt-dlp can actually find a
         # program in: the folder only when it holds the real names, the binary
         # itself otherwise. Getting this wrong costs every merge and every MP3.
@@ -4219,9 +4299,9 @@ if __name__ == "__main__":
         # Only in a packaged build. Running from source there is nothing to
         # bundle yet, and the check that matters is the one the frozen
         # executable makes about its own contents.
-        if getattr(sys, "frozen", False):
+        if getattr(sys, "frozen", False) and expected_flavor == "full":
             _engine = bundled_tool(f"blueknight-youtube{EXE}")
-            assert _engine, "the YoutubeExplode engine is missing from this build"
+            assert _engine, "the YoutubeExplode engine is missing from this full build"
             _probe = subprocess.run([_engine, "info", "https://youtu.be/",
                                      "--output", tempfile.gettempdir()],
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -4286,7 +4366,12 @@ if __name__ == "__main__":
         assert f"v9.9.9/{SPOTDL_ASSETS[OS_TAG].format(v='9.9.9')}" in (
             SpotifyDownloader.tool_download_urls("spotdl", "9.9.9")[0])
         _app = SpotifyDownloader()
-        _app.ytdlp_cmd, _app.ffmpeg_cmd, _app.deno_cmd = ytdlp, ffmpeg, deno
+        # Lite intentionally ships without Deno. Use an existing executable as
+        # a path-only stand-in for CLI construction; no process is launched.
+        # Full uses its real bundled Deno path and separately probes --version.
+        _test_runtime = deno if expected_flavor == "full" else sys.executable
+        _app.ytdlp_cmd, _app.ffmpeg_cmd, _app.deno_cmd = (
+            ytdlp, ffmpeg, _test_runtime)
         _ym_cmd = _app._ytdlp_cmd_for(
             "ytmusic", "https://music.youtube.com/watch?v=1", Path(tempfile.gettempdir()),
             "best", True, None)
@@ -4303,7 +4388,8 @@ if __name__ == "__main__":
             "youtube", "https://youtu.be/g9ilhvSurpQ", Path(tempfile.gettempdir()),
             "best", False, None, clients="android_vr", fresh=True)
         assert "--embed-metadata" in _ym_cmd and "--embed-thumbnail" in _ym_cmd
-        assert "--js-runtimes" in _ym_cmd and any(str(deno) in part for part in _ym_cmd)
+        assert "--js-runtimes" in _ym_cmd and any(
+            str(_test_runtime) in part for part in _ym_cmd)
         assert "--js-runtimes" in _sc_cmd and "--js-runtimes" in _general_cmd
         assert "--sleep-requests" in _ym_cmd
         assert "--ignore-config" in _fresh_cmd
@@ -4618,22 +4704,26 @@ if __name__ == "__main__":
 
         assert not MEDIA_PATTERNS["tiktok"].search("https://open.spotify.com/track/1")
         assert not MEDIA_PATTERNS["youtube"].search("https://nyoutube.com.evil.tld/x")
-        # Every tool the app cannot run without must be in the package and
-        # reachable through the same generic lookup. An optional one is fetched
-        # only if something asks for it, so it is neither shipped nor mirrored —
-        # a missing fallback there costs a fallback, not the app.
+        # Lite releases must exclude native engines; Full releases carry them.
         for _name, _spec in TOOLS.items():
             if _spec.get("optional"):
                 assert _spec["urls"], f"{_name} is optional but unreachable"
                 continue
-            assert bundled_tool(_spec["exe"]), _name
-            assert len(_spec["urls"]) >= 2, f"{_name} needs a fallback mirror"
-        checks = ([spotdl, "--version"], [ffmpeg, "-version"], [ytdlp, "--version"],
-                  [deno, "--version"])
-        for command in checks:
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
-            if result.returncode != 0:
-                raise SystemExit(3)
+            if expected_flavor == "lite":
+                assert not bundled_tool(_spec["exe"]), f"{_name} leaked into Lite"
+            else:
+                assert bundled_tool(_spec["exe"]), _name
+            assert _spec["urls"], f"{_name} needs a download source"
+        if expected_flavor == "full":
+            checks = ([spotdl, "--version"], [ffmpeg, "-version"], [ytdlp, "--version"],
+                      [deno, "--version"])
+            for command in checks:
+                result = subprocess.run(command, stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT, timeout=30)
+                if result.returncode != 0:
+                    raise SystemExit(3)
+        else:
+            assert not bundled_tool(f"ffprobe{EXE}"), "ffprobe leaked into Lite"
         raise SystemExit(0)
     else:
         main()

@@ -5,14 +5,20 @@ TikTok, Instagram, SoundCloud, X, PDF/ebook documents, and other
 yt-dlp-supported video sites**, sorting what it fetches, and handling restricted
 networks and common sign-in walls.
 
-The maintained desktop targets are Linux and Windows. Linux is the primary development target. Windows compatibility remains a secondary goal, but automated Windows builds and smoke tests are temporarily paused; the Windows build script is retained for manual verification.
-The downloader currently uses a Python engine and a local WebView interface.
-The interface is split into HTML, CSS and ordered JavaScript files; the engine
-and platform packaging are being modularized without dropping existing features.
+The maintained desktop targets are Linux and Windows. Official builds are
+Linux Lite, Linux Full and Windows Full. All three share the same Python engine
+and WebView interface; only the Linux package flavor changes which native
+engines are prebundled.
 
-The **Update all components** button checks bundled downloaders and converters,
-verifies Python wheels against PyPI's SHA-256 digest, and activates validated
-Python updates on restart.
+Linux Lite never downloads large native tools at startup. It checks local
+availability and installs spotDL, yt-dlp, FFmpeg and Deno only when the selected
+workflow needs them. Linux Full and Windows Full ship those tools and the
+available .NET/JVM fallback helpers.
+
+The **Update all components** action updates components that are already
+installed. It does not install missing optional engines; those remain deferred
+until their feature is first used. Python wheels are SHA-256 checked against
+PyPI and validated as a set before activation on restart.
 
 <sub>Telegram: <a href="https://t.me/BlueKnight_Net">@BlueKnight_Net</a></sub>
 
@@ -228,14 +234,15 @@ account or a different IP may still be required.
 
 ## Keeping it current
 
-**Update all components** refreshes spotDL, yt-dlp, Deno, FFmpeg, gallery-dl,
-Streamlink, img2pdf, Pillow, pikepdf and the certifi CA bundle. Executables download
-to temporary files and must launch successfully before an atomic replacement.
-Python wheels are SHA-256 checked, staged as one set, and exercised together by a
-fresh process before their registry is committed; they activate on restart. A
-failed or incompatible update leaves the working downloader unchanged. Downloads
-and conversions cannot start during activation, preventing a tool from changing
-underneath a running job.
+**Update all components** refreshes installed spotDL, yt-dlp, Deno and FFmpeg
+engines plus the Python component wheels. Missing native tools are not installed
+by this action: they are acquired on demand by the feature that needs them.
+Executables download to temporary files and must launch successfully before an
+atomic replacement. Python wheels are SHA-256 checked, staged as one set, and
+exercised together by a fresh process before their registry is committed; they
+activate on restart. A failed or incompatible update leaves the working
+downloader unchanged. Downloads and conversions cannot start during activation,
+preventing a tool from changing underneath a running job.
 
 The tools use mirrored hosts (GitHub, with SourceForge as an escape hatch where
 available). The check also reports whether usable Instagram and SoundCloud
@@ -256,21 +263,37 @@ engines current is important.
 bash ./build_portable.sh
 ```
 
-Both desktop builds use Python 3.12. The scripts fetch or prepare the required
-command-line tools and create a portable package under `release/`:
+Both desktop builds use Python 3.12. Build the Linux flavor explicitly:
 
-- Windows: `BlueKnightDownloader-windows-x64.zip`
-- Linux: `BlueKnightDownloader-linux-x64.tar.gz`
+```bash
+bash ./build_portable.sh --flavor lite
+bash ./build_portable.sh --flavor full
+```
 
-The Linux build needs the WebKitGTK 4.1 and GTK development packages. The
-resulting Linux archive does not bundle WebKitGTK; the matching runtime
-libraries must be installed on the target system. Both release archives include
-portable.mode, which stores updateable tools and application-managed data under
-a data/ directory beside the executable. A JDK 17 and .NET 8 SDK are used to
-build the NewPipe and YoutubeExplode fallback helpers when available.
+The Windows script always creates the Full package:
 
-CI currently builds and smoke-tests Linux x64 only. Windows packaging remains available through `build_portable.ps1`, but its automated job is paused. Tags named
-`downloader-v*` or `Blueknightv*` publish the Linux TAR.GZ artifact.
+```powershell
+.\\build_portable.ps1
+```
+
+The scripts create these archives under `release/`:
+
+- Linux Lite: `BlueKnightDownloader-linux-x64-lite.tar.gz`
+- Linux Full: `BlueKnightDownloader-linux-x64-full.tar.gz`
+- Windows Full: `BlueKnightDownloader-windows-x64.zip`
+
+Lite excludes the spotDL, yt-dlp, Deno and FFmpeg native binaries and the
+optional .NET/JVM helpers. The application fetches an engine into its own
+portable data directory when a matching feature is used. Full and Windows
+include the native engines and fallback helpers. The Linux build requires
+WebKitGTK 4.1 and GTK development packages; the runtime libraries still need
+to be installed on the target system because they are not bundled. All
+archives include `portable.mode`, so app-managed data lives under `data/`
+beside the executable.
+
+CI builds and smoke-tests all three packages on native Linux and Windows
+runners. Tags named `downloader-v*` or `Blueknightv*` publish the artifacts
+as a GitHub Pre-release.
 
 | File | Role |
 | --- | --- |

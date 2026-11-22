@@ -23,15 +23,20 @@ class PortableDataMigrationTests(unittest.TestCase):
         self.env = patch.dict(os.environ, {
             "BLUEKNIGHT_HOME": str(self.home),
             "XDG_DATA_HOME": str(self.xdg),
+            "LOCALAPPDATA": str(self.xdg),
         })
         self.env.start()
         os.environ.pop("BLUEKNIGHT_DATA", None)
-        self.platform_patches = [
-            patch("blueknight_paths.IS_WINDOWS", False),
-            patch("blueknight_paths.IS_MACOS", False),
-        ]
-        for item in self.platform_patches:
-            item.start()
+        # Exercise the real host platform. Forcing IS_WINDOWS=False here made
+        # Windows execute POSIX-only fchmod/chmod paths during the test suite.
+        self.platform_patches = []
+        if os.name != "nt":
+            self.platform_patches = [
+                patch("blueknight_paths.IS_WINDOWS", False),
+                patch("blueknight_paths.IS_MACOS", False),
+            ]
+            for item in self.platform_patches:
+                item.start()
 
     def tearDown(self):
         for item in reversed(self.platform_patches):
@@ -184,8 +189,11 @@ class PortableDataMigrationTests(unittest.TestCase):
     def test_cookie_directories_are_owner_only_on_posix(self):
         site_dir = blueknight_paths.cookie_dir("youtube")
         root_dir = self.home / blueknight_paths.COOKIE_DIR_NAME
-        self.assertEqual(stat.S_IMODE(root_dir.stat().st_mode), 0o700)
-        self.assertEqual(stat.S_IMODE(site_dir.stat().st_mode), 0o700)
+        self.assertTrue(root_dir.is_dir())
+        self.assertTrue(site_dir.is_dir())
+        if os.name == "posix":
+            self.assertEqual(stat.S_IMODE(root_dir.stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE(site_dir.stat().st_mode), 0o700)
 
     def test_cookie_jar_is_atomic_and_owner_only_on_posix(self):
         from http.cookies import SimpleCookie
@@ -198,7 +206,8 @@ class PortableDataMigrationTests(unittest.TestCase):
         cookies["sessionid"]["secure"] = True
 
         self.assertEqual(blueknight_paths.write_netscape_jar([cookies], destination), 1)
-        self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
+        if os.name == "posix":
+            self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o600)
         content = destination.read_text(encoding="utf-8")
         self.assertIn(".instagram.com\tTRUE\t/\tTRUE\t", content)
         self.assertTrue(content.rstrip().endswith("sessionid\tprivate-session-value"))
