@@ -374,6 +374,23 @@ body {
   cursor: default;
 }
 
+/* Keep chrome controls steady, but let useful product copy and output be copied. */
+p, h1, h2, h3, label, .hint, .lede, .group-head, .converter-panel-head,
+.console, .run-path, .preview-title, .preview-sub, .toast, .gate-detail {
+  -webkit-user-select: text;
+  user-select: text;
+}
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+  caret-color: var(--spotify);
+}
+::selection {
+  background: color-mix(in srgb, var(--spotify) 32%, var(--pane-solid));
+  color: var(--ink);
+}
+a { text-underline-offset: .2em; }
+
 /* The knight artwork, deepest layer of all. It sits under the accent washes so
    every mode retints it — blue for Spotify, red for YouTube, cyan for TikTok —
    instead of dragging its own colour into the room. Desaturated first for the
