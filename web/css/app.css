@@ -51,6 +51,7 @@
   --r-lg: 18px;
   --r-md: 12px;
   --r-sm: 8px;
+  --chrome-filter: blur(18px) saturate(150%);
   --gap: 14px;
   --outer-gutter: 14px;
   /* At the normal 820px window this lifts both panes by about 12px (1.5%). */
@@ -77,6 +78,12 @@ html[data-theme="dark"] {
   --on-accent: #04140a;
   --pane-solid: #0d131a;
   --control-solid: #111a24;
+  --chrome-surface: rgba(10, 16, 24, .90);
+  --chrome-hover: rgba(255, 255, 255, .075);
+  --chrome-active: rgba(255, 255, 255, .12);
+  --chrome-edge: rgba(255, 255, 255, .15);
+  --progress-track: rgba(255, 255, 255, .12);
+  --progress-tick: rgba(255, 255, 255, .24);
   /* Light enough that the knight reads through the panes — the glass is a
      veil, not a wall. Push it back up if text starts fighting the art. */
   --blur: saturate(150%);
@@ -150,6 +157,12 @@ html[data-theme="light"] {
   --on-accent: #ffffff;
   --pane-solid: #f4f6fa;
   --control-solid: #f7f9fc;
+  --chrome-surface: rgba(247, 249, 252, .91);
+  --chrome-hover: rgba(25, 40, 58, .055);
+  --chrome-active: rgba(25, 40, 58, .095);
+  --chrome-edge: rgba(25, 40, 58, .13);
+  --progress-track: rgba(25, 40, 58, .11);
+  --progress-tick: rgba(25, 40, 58, .22);
   --mark-ink: color-mix(in srgb, var(--tint) 62%, #10202f);
   --mark-plate: rgb(255 255 255 / .07);
   /* Unchanged from what light already looked right at. */
@@ -441,6 +454,9 @@ body::before {
 
 .side {
   grid-area: side;
+  background: var(--chrome-surface);
+  -webkit-backdrop-filter: var(--chrome-filter);
+  backdrop-filter: var(--chrome-filter);
   display: flex;
   flex-direction: column;
   padding: 20px 14px 14px;
@@ -476,8 +492,8 @@ body::before {
   text-align: left; cursor: pointer;
   transition: background .16s, color .16s;
 }
-.nav button:hover { background: var(--glass-2); color: var(--ink); }
-.nav button.on { background: var(--glass-3); color: var(--ink); }
+.nav button:hover { background: var(--chrome-hover); color: var(--ink); }
+.nav button.on { background: var(--chrome-active); color: var(--ink); }
 .nav .dot {
   width: 5px; height: 5px; border-radius: 50%;
   background: var(--ink-3);
@@ -749,8 +765,35 @@ body.busy .status-word { color: var(--spotify); }
   max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.bar { height: 6px; border-radius: 3px; overflow: hidden; background: var(--glass-3); flex: none; }
-.bar-fill { height: 100%; width: 0%; background: var(--signal); transition: width .3s ease-out; }
+.bar {
+  position: relative;
+  isolation: isolate;
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--progress-track);
+  flex: none;
+}
+.bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 17px,
+    var(--progress-tick) 17px 18px);
+}
+.bar-fill {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--spotify);
+  transition: width .3s ease-out;
+}
 /* The destination, one line, truncated from the left so the filename survives. */
 .run-path {
   margin-top: 8px;
@@ -961,17 +1004,18 @@ body.busy .status-word { color: var(--spotify); }
   min-width: 260px; max-width: 420px;
   padding: 11px 15px;
   border-radius: var(--r-md);
-  border: 1px solid var(--edge);
-  background: var(--glass-3);
-  backdrop-filter: var(--blur);
+  border: 1px solid var(--chrome-edge);
+  background: var(--chrome-surface);
+  -webkit-backdrop-filter: var(--chrome-filter);
+  backdrop-filter: var(--chrome-filter);
   box-shadow: var(--shadow);
   font-size: 12.5px;
   white-space: pre-wrap;
   animation: rise .22s ease-out;
 }
-.toast.err { border-left: 2px solid var(--red); }
-.toast.ok { border-left: 2px solid var(--spotify); }
-.toast.info { border-left: 2px solid var(--knight); }
+.toast.err { background: color-mix(in srgb, var(--chrome-surface) 93%, var(--red)); }
+.toast.ok { background: color-mix(in srgb, var(--chrome-surface) 93%, var(--spotify)); }
+.toast.info { background: color-mix(in srgb, var(--chrome-surface) 93%, var(--knight)); }
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 
 .gate {
@@ -1000,7 +1044,12 @@ body.busy .status-word { color: var(--spotify); }
 }
 .gate-card h2 { font-family: var(--font-display); font-size: 21px; font-weight: 600; margin-top: 16px; }
 .gate-card p { color: var(--ink-2); font-size: 13px; margin: 10px 0 20px; }
-.gate-bar { height: 3px; border-radius: 2px; overflow: hidden; background: var(--glass-3); }
+.gate-bar {
+  height: 3px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--progress-track);
+}
 
 /* ========================================================= phone shell ====
    The desktop window has a 1005px minimum, so nothing below can fire there.
@@ -1090,15 +1139,17 @@ html.android .nav button .dot { display: none; }
     gap: 1px;
     min-height: 46px;
     padding: 5px 9px;
-    border: 1px solid var(--edge-2);
+    border: 1px solid var(--chrome-edge);
     border-radius: var(--r-md);
-    background: var(--glass);
+    background: var(--chrome-surface);
+    -webkit-backdrop-filter: var(--chrome-filter);
+    backdrop-filter: var(--chrome-filter);
     color: var(--ink);
     text-align: left;
     cursor: pointer;
     transition: border-color .25s ease, background .25s ease;
   }
-  .mbar-source:active { background: var(--glass-2); }
+  .mbar-source:active { background: var(--chrome-active); }
   .mbar-source:focus-visible { outline: 2px solid var(--spotify); outline-offset: 2px; }
   .mbar-kicker {
     font-family: var(--font-mono);
@@ -1129,19 +1180,22 @@ html.android .nav button .dot { display: none; }
     flex: none;
     width: 44px; height: 44px;
     display: grid; place-content: center; gap: 4px;
-    border: 1px solid var(--edge-2); border-radius: var(--r-md);
-    background: var(--glass); cursor: pointer;
+    border: 1px solid var(--chrome-edge); border-radius: var(--r-md);
+    background: var(--chrome-surface);
+    -webkit-backdrop-filter: var(--chrome-filter);
+    backdrop-filter: var(--chrome-filter);
+    cursor: pointer;
     padding: 0;
   }
   /* In the bar the theme control is icon-only; its words survive as the
      accessible name rather than being dropped. */
   .mbar #theme-btn > #theme-label { display: none; }
   .mbar #theme-btn { color: var(--ink-2); }
-  .mbar #theme-btn:active { background: var(--glass-2); color: var(--ink); }
+  .mbar #theme-btn:active { background: var(--chrome-active); color: var(--ink); }
   .mbar #theme-btn:focus-visible { outline: 2px solid var(--spotify); outline-offset: 2px; }
   .mbar .theme-icon svg { width: 18px; height: 18px; }
   .mbar-btn span { display: block; width: 15px; height: 1.5px; background: var(--ink-2); }
-  .mbar-btn:active { background: var(--glass-2); }
+  .mbar-btn:active { background: var(--chrome-active); }
   .mbar-btn:focus-visible { outline: 2px solid var(--spotify); outline-offset: 2px; }
 
   /* --------------------------------------------------------- the page --- */
@@ -1330,22 +1384,16 @@ html.android .nav button .dot { display: none; }
     padding: calc(24px + env(safe-area-inset-top)) 14px
              calc(18px + env(safe-area-inset-bottom));
     border: 0;
+    border-top: 1px solid var(--chrome-edge);
     border-radius: 0;
-    /* A flat fill under a dozen lit tiles reads as a hole. The faint knight-blue
-       lift at the top gives the panel its own light, matching the app bar it
-       slides up over — and the two low-amplitude pools underneath are what the
-       glass has to refract. Without something behind them, translucent tiles
-       are just tinted rectangles. */
+    /* The sheet stays tinted by the active service, but its surface is dense
+       enough to keep labels calm and readable over the moving artwork. */
     background:
       radial-gradient(120% 52% at 50% 0%,
-        color-mix(in srgb, var(--knight) 13%, transparent), transparent 72%),
-      radial-gradient(58% 34% at 14% 26%,
-        color-mix(in srgb, var(--knight) 24%, transparent), transparent 72%),
-      radial-gradient(64% 32% at 88% 72%,
-        color-mix(in srgb, var(--spotify) 16%, transparent), transparent 72%),
-      linear-gradient(180deg,
-        color-mix(in srgb, var(--knight) 5%, var(--pane-solid)) 0%,
-        var(--pane-solid) 44%);
+        color-mix(in srgb, var(--knight) 8%, transparent), transparent 72%),
+      var(--chrome-surface);
+    -webkit-backdrop-filter: var(--chrome-filter);
+    backdrop-filter: var(--chrome-filter);
     box-shadow: var(--shadow);
     will-change: transform;
     animation: sheet-up .3s cubic-bezier(.2, .9, .26, 1);
@@ -1362,16 +1410,18 @@ html.android .nav button .dot { display: none; }
     width: 34px;
     height: 34px;
     padding: 0;
-    border: 1px solid var(--edge-2);
+    border: 1px solid var(--chrome-edge);
     border-radius: 50%;
-    background: var(--glass);
+    background: var(--chrome-surface);
+    -webkit-backdrop-filter: var(--chrome-filter);
+    backdrop-filter: var(--chrome-filter);
     color: var(--ink-2);
     font-size: 19px;
     line-height: 1;
     cursor: pointer;
     transition: background .16s, color .16s;
   }
-  .sheet-close:active { background: var(--glass-2); color: var(--ink); }
+  .sheet-close:active { background: var(--chrome-active); color: var(--ink); }
   .sheet-close:focus-visible { outline: 2px solid var(--spotify); outline-offset: 2px; }
   .sheet-content {
     width: min(100%, 520px);
@@ -1758,3 +1808,22 @@ html.android .nav button .dot { display: none; }
 .row--settings-padding { padding: 8px 2px; }
 .row--compact-padding { padding: 2px; }
 #gate-skip { margin-top: 18px; }
+
+
+/* Respect the OS request to reduce transparency without changing layout. */
+@media (prefers-reduced-transparency: reduce) {
+  .side,
+  .mbar-source,
+  .mbar-btn,
+  .mbar #theme-btn,
+  .sheet-body,
+  .sheet-close,
+  .toast,
+  .toast.err,
+  .toast.ok,
+  .toast.info {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--pane-solid);
+  }
+}
