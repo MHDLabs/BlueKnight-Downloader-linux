@@ -188,7 +188,7 @@ function sheetFocusables() {
   return [...$("sheet").querySelectorAll(
     'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
   )].filter(el =>
-    !el.hidden && el.getAttribute("aria-hidden") !== "true" && el.getClientRects().length
+    el.tabIndex >= 0 && !el.hidden && el.getAttribute("aria-hidden") !== "true" && el.getClientRects().length
   );
 }
 
@@ -274,6 +274,19 @@ function setupPhone() {
     if (foot) document.querySelector(".side").appendChild(foot);
     // Last child of the sidebar footer is where it started.
     if (foot && theme) foot.appendChild(theme);
+
+    // A phone sheet must not survive a rotation or resize into desktop layout.
+    const sheet = $("sheet");
+    if (!sheet.hidden) {
+      const focusWasInside = sheet.contains(document.activeElement);
+      clearTimeout(sheetExit);
+      sheet.hidden = true;
+      sheet.classList.remove("closing");
+      sheetReturnFocus = null;
+      $("mbar-source").setAttribute("aria-expanded", "false");
+      $("mbar-more").setAttribute("aria-expanded", "false");
+      if (focusWasInside) document.querySelector("#nav button.on")?.focus();
+    }
     return;
   }
   // Theme is a property of the app, not of the section you are picking, so on
