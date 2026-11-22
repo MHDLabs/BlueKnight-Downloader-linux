@@ -4366,7 +4366,12 @@ if __name__ == "__main__":
         assert f"v9.9.9/{SPOTDL_ASSETS[OS_TAG].format(v='9.9.9')}" in (
             SpotifyDownloader.tool_download_urls("spotdl", "9.9.9")[0])
         _app = SpotifyDownloader()
-        _app.ytdlp_cmd, _app.ffmpeg_cmd, _app.deno_cmd = ytdlp, ffmpeg, deno
+        # Lite intentionally ships without Deno. Use an existing executable as
+        # a path-only stand-in for CLI construction; no process is launched.
+        # Full uses its real bundled Deno path and separately probes --version.
+        _test_runtime = deno if expected_flavor == "full" else sys.executable
+        _app.ytdlp_cmd, _app.ffmpeg_cmd, _app.deno_cmd = (
+            ytdlp, ffmpeg, _test_runtime)
         _ym_cmd = _app._ytdlp_cmd_for(
             "ytmusic", "https://music.youtube.com/watch?v=1", Path(tempfile.gettempdir()),
             "best", True, None)
@@ -4383,7 +4388,8 @@ if __name__ == "__main__":
             "youtube", "https://youtu.be/g9ilhvSurpQ", Path(tempfile.gettempdir()),
             "best", False, None, clients="android_vr", fresh=True)
         assert "--embed-metadata" in _ym_cmd and "--embed-thumbnail" in _ym_cmd
-        assert "--js-runtimes" in _ym_cmd and any(str(deno) in part for part in _ym_cmd)
+        assert "--js-runtimes" in _ym_cmd and any(
+            str(_test_runtime) in part for part in _ym_cmd)
         assert "--js-runtimes" in _sc_cmd and "--js-runtimes" in _general_cmd
         assert "--sleep-requests" in _ym_cmd
         assert "--ignore-config" in _fresh_cmd
