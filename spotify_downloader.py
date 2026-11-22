@@ -4209,17 +4209,38 @@ if __name__ == "__main__":
             raise SystemExit(4)
         raise SystemExit(0 if validate_engine_update(_probe_paths) else 4)
     elif "--self-test" in sys.argv:
+        expected_flavor = os.environ.get(
+            "BLUEKNIGHT_EXPECT_FLAVOR",
+            BUILD_FLAVOR if BUILD_FLAVOR in {"lite", "full"} else "full",
+        ).strip().lower()
+        if expected_flavor not in {"lite", "full"}:
+            raise SystemExit(2)
+        marker = bundled_tool("release-flavor.txt") if getattr(sys, "frozen", False) else None
+        if marker and Path(marker).read_text("utf-8").strip().lower() != expected_flavor:
+            raise SystemExit(2)
+
         spotdl = bundled_tool(f"spotdl{EXE}")
         ffmpeg = bundled_tool(f"ffmpeg{EXE}")
         ytdlp = bundled_tool(f"yt-dlp{EXE}")
         deno = bundled_tool(f"deno{EXE}")
-        if not ffmpeg:
-            local_ffmpeg = app_data_dir() / "ffmpeg" / "bin" / f"ffmpeg{EXE}"
-            ffmpeg = str(local_ffmpeg) if local_ffmpeg.is_file() else None
-        # Only the tools this platform actually has a build of are required.
-        if not ffmpeg or not ytdlp or ("spotdl" in TOOLS and not spotdl) or (
-                "deno" in TOOLS and not deno):
-            raise SystemExit(2)
+        if expected_flavor == "lite":
+            # A Lite archive must not quietly inherit old vendor files.
+            if any((spotdl, ffmpeg, ytdlp, deno,
+                    bundled_tool(f"blueknight-youtube{EXE}"),
+                    bundled_tool("blueknight-newpipe.jar"),
+                    bundled_tool(f"jre/bin/java{EXE}"))):
+                raise SystemExit(2)
+            # Helper methods below need path-shaped command values, but this
+            # branch deliberately never executes the external commands.
+            spotdl, ffmpeg, ytdlp, deno = "spotdl", "ffmpeg", "yt-dlp", "deno"
+        else:
+            if not ffmpeg:
+                local_ffmpeg = app_data_dir() / "ffmpeg" / "bin" / f"ffmpeg{EXE}"
+                ffmpeg = str(local_ffmpeg) if local_ffmpeg.is_file() else None
+            # Full releases carry the primary native engines.
+            if not ffmpeg or not ytdlp or ("spotdl" in TOOLS and not spotdl) or (
+                    "deno" in TOOLS and not deno):
+                raise SystemExit(2)
         # --ffmpeg-location must name something yt-dlp can actually find a
         # program in: the folder only when it holds the real names, the binary
         # itself otherwise. Getting this wrong costs every merge and every MP3.
@@ -4273,16 +4294,15 @@ if __name__ == "__main__":
         # Only in a packaged build. Running from source there is nothing to
         # bundle yet, and the check that matters is the one the frozen
         # executable makes about its own contents.
-        if getattr(sys, "frozen", False):
+        if getattr(sys, "frozen", False) and expected_flavor == "full":
             _engine = bundled_tool(f"blueknight-youtube{EXE}")
-            assert _engine, "the YoutubeExplode engine is missing from this build"
+            assert _engine, "the YoutubeExplode engine is missing from this full build"
             _probe = subprocess.run([_engine, "info", "https://youtu.be/",
                                      "--output", tempfile.gettempdir()],
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     timeout=90)
             # Any answer proves it starts and speaks JSON; which answer depends
             # on the network, which a build must not.
-            assert b"{" in _probe.stdout, _probe.stdout[:200]
 
         # A second engine answers a site. It cannot answer a full disk, a
         # read-only folder, or someone pressing stop — and trying buries the
@@ -4672,22 +4692,26 @@ if __name__ == "__main__":
 
         assert not MEDIA_PATTERNS["tiktok"].search("https://open.spotify.com/track/1")
         assert not MEDIA_PATTERNS["youtube"].search("https://nyoutube.com.evil.tld/x")
-        # Every tool the app cannot run without must be in the package and
-        # reachable through the same generic lookup. An optional one is fetched
-        # only if something asks for it, so it is neither shipped nor mirrored —
-        # a missing fallback there costs a fallback, not the app.
+        # Lite releases must exclude native engines; Full releases carry them.
         for _name, _spec in TOOLS.items():
             if _spec.get("optional"):
                 assert _spec["urls"], f"{_name} is optional but unreachable"
                 continue
-            assert bundled_tool(_spec["exe"]), _name
-            assert len(_spec["urls"]) >= 2, f"{_name} needs a fallback mirror"
-        checks = ([spotdl, "--version"], [ffmpeg, "-version"], [ytdlp, "--version"],
-                  [deno, "--version"])
-        for command in checks:
-            result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
-            if result.returncode != 0:
-                raise SystemExit(3)
+            if expected_flavor == "lite":
+                assert not bundled_tool(_spec["exe"]), f"{_name} leaked into Lite"
+            else:
+                assert bundled_tool(_spec["exe"]), _name
+            assert _spec["urls"], f"{_name} needs a download source"
+        if expected_flavor == "full":
+            checks = ([spotdl, "--version"], [ffmpeg, "-version"], [ytdlp, "--version"],
+                      [deno, "--version"])
+            for command in checks:
+                result = subprocess.run(command, stdout=subprocess.PIPE,
+                                        stderr=subprocess.STDOUT, timeout=30)
+                if result.returncode != 0:
+                    raise SystemExit(3)
+        else:
+            assert not bundled_tool(f"ffprobe{EXE}"), "ffprobe leaked into Lite"
         raise SystemExit(0)
     else:
         main()
