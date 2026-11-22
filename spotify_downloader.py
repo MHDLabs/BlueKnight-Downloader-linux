@@ -1512,6 +1512,8 @@ class SpotifyDownloader:
         except Exception as exc:
             self.log(f"Spotify components are unavailable: {str(exc)[:220]}", "error")
             self.ui("failure", f"Could not prepare Spotify download: {str(exc)[:220]}")
+            self.download_finished()
+            self.ui("status", "Ready")
             self.ui("finished")
             return
         fmt = options["format"]
@@ -2931,6 +2933,8 @@ class SpotifyDownloader:
         except Exception as exc:
             self.log(f"Media components are unavailable: {str(exc)[:220]}", "error")
             self.ui("failure", f"Could not prepare this download: {str(exc)[:220]}")
+            self.download_finished()
+            self.ui("status", "Ready")
             self.ui("finished")
             return
         self.sync_proxy_env()
