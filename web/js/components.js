@@ -13,7 +13,9 @@ function paintConverter() {
     panel.hidden = panel.dataset.converterPanel !== mode;
   });
   document.querySelectorAll(".format-picker [data-format]").forEach(button => {
-    button.setAttribute("aria-checked", String(button.dataset.format === format));
+    const selected = button.dataset.format === format;
+    button.setAttribute("aria-checked", String(selected));
+    button.tabIndex = selected ? 0 : -1;
   });
   const lossless = ["flac", "wav"].includes(format);
   $("media-custom-size").hidden = $("media-convert-resize").value !== "custom";
