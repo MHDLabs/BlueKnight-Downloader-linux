@@ -103,11 +103,13 @@ installed for workflows that need them.
 4. Install WebKitGTK 4.1 and the required GTK runtime libraries.
 5. Run `./BlueKnightDownloader` from the extracted directory.
 
-Lite and Full use the same application and feature set. Lite stores downloaded
-engines under the app's portable data directory and never installs them globally
-or asks for administrator privileges. If a feature needs a missing engine, the
-app downloads it at that point. Full is preferable for offline setup or when
-you want the engines present before the first use.
+Lite and Full share the same main application and download workflows.
+Lite excludes the optional .NET and JVM fallback helpers, so a few sources may
+have fewer fallback routes when the primary extractor cannot handle them. Lite
+stores downloaded native engines under the app's portable data directory and
+never installs them globally or asks for administrator privileges. If a feature
+needs a missing engine, the app downloads it at that point. Full is preferable
+for offline setup and maximum fallback coverage.
 
 Neither Linux package bundles the complete WebKitGTK browser runtime.
 WebKitGTK 4.1 must be provided by the host distribution.
