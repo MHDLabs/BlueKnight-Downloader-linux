@@ -131,6 +131,7 @@ def main() -> int:
     components = (WEB / "js" / "components.js").read_text(encoding="utf-8")
     shell = (WEB / "js" / "shell.js").read_text(encoding="utf-8")
     routing = (WEB / "js" / "routing.js").read_text(encoding="utf-8")
+    runtime = (WEB / "js" / "runtime.js").read_text(encoding="utf-8")
 
     ui_text = html + routing
     if any(marker in ui_text for marker in ("â†", "âœ", "�")):
@@ -138,6 +139,26 @@ def main() -> int:
 
     if 'id="convert"' in html:
         raise AssertionError("The retired, unhandled MP3-to-FLAC control must not be rendered")
+
+    source_input_labels = {
+        "url": "Spotify link", "yt-url": "YouTube link", "ym-url": "YouTube Music link",
+        "tt-url": "TikTok link or username", "ig-url": "Instagram link",
+        "sc-url": "SoundCloud link", "x-url": "X post link",
+        "gen-url": "Video or media page link", "pdf-url": "Document or ebook link",
+    }
+    for element_id, label in source_input_labels.items():
+        pattern = rf'<input\b[^>]*\bid="{re.escape(element_id)}"[^>]*\baria-label="{re.escape(label)}"'
+        if not re.search(pattern, html):
+            raise AssertionError(f"Source input {element_id!r} must have an accessible name")
+
+    if 'role="tablist"' in html or 'role="tab"' in html:
+        raise AssertionError("Pressed converter-mode buttons must not claim tab semantics")
+    if 'role="group" aria-label="Converter type"' not in html:
+        raise AssertionError("Converter mode buttons must have a named toggle group")
+    if 'button.tabIndex = selected ? 0 : -1;' not in components:
+        raise AssertionError("Format radio groups must keep one selected tab stop")
+    if 'event.key === "ArrowRight"' not in runtime or 'event.key === "Home"' not in runtime:
+        raise AssertionError("Format radio groups must support arrow, Home, and End keyboard navigation")
 
     if 'aria-controls="sheet"' not in html or 'aria-expanded="false"' not in html:
         raise AssertionError("Mobile menu triggers must expose their controlled dialog state")
